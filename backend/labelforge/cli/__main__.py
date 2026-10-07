@@ -199,7 +199,7 @@ def cmd_providers(_args) -> int:
     for p in describe_providers():
         status = "tersedia" if p["available"] else f"TIDAK tersedia: {p['unavailable_reason']}"
         default = f" [DEFAULT, mode {p['default_mode']}]" if p["is_default"] else ""
-        print(f"{p['name']} ({p['label']}){default} — {status}")
+        print(f"{p['name']} ({p['label']}){default}: {status}")
         for mode, specs in p["params"].items():
             params = ", ".join(f"{s['name']}={s['default']}" for s in specs)
             print(f"  mode {mode}: {params}")

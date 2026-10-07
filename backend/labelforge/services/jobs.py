@@ -53,7 +53,7 @@ def select_target_images(
     elif target == JobTarget.SELECTED:
         if not image_ids:
             raise JobRequestError("Pilih minimal satu gambar")
-        # Gambar terpilih diproses apa pun statusnya — user memilihnya secara eksplisit.
+        # Gambar terpilih diproses apa pun statusnya karena user memilihnya secara eksplisit.
         query = query.where(Image.id.in_(image_ids))
     elif not include_reviewed:
         query = query.where(Image.status != ImageStatus.REVIEWED)

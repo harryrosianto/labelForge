@@ -31,7 +31,7 @@ browser ──► frontend (React + Vite, nginx di Docker)
 
 **Kenapa Celery + Redis:** proses web tetap ringan & responsif (tidak memuat torch), model
 cukup di-load sekali di worker, job tidak hilang saat web restart (`acks_late`), dan queue
-per jenis pekerjaan (`inference`, nanti `training`) bisa diarahkan ke mesin berbeda.
+per jenis pekerjaan (mis. `inference`, `training`) bisa diarahkan ke mesin berbeda.
 
 ### Provider auto-label
 
@@ -42,9 +42,9 @@ per jenis pekerjaan (`inference`, nanti `training`) bisa diarahkan ke mesin berb
 | Grounding DINO | `text` | `ai:grounding_dino` | `grounding-dino-base`; ~24 dtk/gambar di CPU |
 | Remote | `<provider>:<mode>` | sama dengan model di server | Memanggil inference server LabelForge di mesin lain |
 
-> Spesifikasi awal menetapkan Grounding DINO sebagai default. Setelah diuji pada foto CCTV
-> gudang, OWLv2 teks mendeteksi pallet lebih baik dan ~2,5× lebih cepat, sehingga dijadikan
-> default. Ubah dengan `DEFAULT_PROVIDER` / `DEFAULT_MODE` di `.env`.
+> OWLv2 teks menjadi default karena pada uji foto CCTV gudang mendeteksi pallet lebih baik
+> dan ~2,5× lebih cepat dibanding Grounding DINO. Ubah dengan `DEFAULT_PROVIDER` /
+> `DEFAULT_MODE` di `.env`.
 
 Tips prompt: tulis sinonim dipisah koma, mis. class `pallet` → `wooden pallet, plastic pallet`.
 Setiap frasa menjadi query tersendiri yang dipetakan ke class yang sama.
@@ -265,4 +265,5 @@ frontend/src/
   api/ components/ lib/
 ```
 
-Tabel `dataset_versions` dan `models` sudah ada di schema untuk Fase 2 dan 3, fiturnya belum.
+Schema juga menyediakan tabel `dataset_versions` dan `models` untuk Fase 2 dan 3 (lihat
+[ROADMAP.md](ROADMAP.md)).

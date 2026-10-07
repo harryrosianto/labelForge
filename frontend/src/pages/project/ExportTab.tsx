@@ -17,7 +17,7 @@ interface Preview {
 }
 
 const FORMATS: [Format, string, string][] = [
-  ['yolo', 'YOLO', 'images/, labels/ (txt ternormalisasi), data.yaml — siap untuk training YOLO'],
+  ['yolo', 'YOLO', 'images/, labels/ (txt ternormalisasi), data.yaml, siap untuk training YOLO'],
   ['coco', 'COCO JSON', 'images/ + annotations/instances_{split}.json (bbox pixel)'],
 ]
 
@@ -125,7 +125,7 @@ export function ExportTab() {
               </Field>
             ))}
           </div>
-          {total !== 100 && valid && <p className="mt-1 text-xs text-amber-700">Total {total}% — akan dinormalisasi.</p>}
+          {total !== 100 && valid && <p className="mt-1 text-xs text-amber-700">Total {total}%, akan dinormalisasi.</p>}
           {!valid && <p className="mt-1 text-xs text-rose-600">Split train harus lebih dari 0.</p>}
         </fieldset>
 
@@ -140,7 +140,7 @@ export function ExportTab() {
       </form>
 
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <h2 className="mb-3 font-semibold">Isi export {project ? `— ${project.name}` : ''}</h2>
+        <h2 className="mb-3 font-semibold">Isi export {project ? `: ${project.name}` : ''}</h2>
         {preview.isLoading && <Spinner />}
         <ErrorText error={preview.error} />
         {preview.data && preview.data.images === 0 && (
@@ -181,7 +181,7 @@ export function ExportTab() {
               </tbody>
             </table>
             {Object.values(preview.data.per_class).some((n) => n === 0) && (
-              <p className="text-xs text-amber-700">Ada class tanpa box — model tidak akan belajar mengenalinya.</p>
+              <p className="text-xs text-amber-700">Ada class tanpa box, model tidak akan belajar mengenalinya.</p>
             )}
           </div>
         )}

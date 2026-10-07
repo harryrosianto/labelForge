@@ -34,7 +34,7 @@ function IssueList({ title, items, className }: { title: string; items: UploadIs
       <ul className="mt-1 max-h-48 overflow-auto pl-4 text-slate-600">
         {items.map((i, n) => (
           <li key={n}>
-            {i.filename} — {i.detail}
+            {i.filename}: {i.detail}
           </li>
         ))}
       </ul>

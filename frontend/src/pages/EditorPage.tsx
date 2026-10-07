@@ -15,7 +15,7 @@ import { filtersFromParams } from '../lib/route'
 const SHORTCUTS: [string, string][] = [
   ['← / →', 'Gambar sebelumnya / berikutnya (otomatis simpan)'],
   ['Drag', 'Gambar box baru dengan class aktif'],
-  ['1 – 9', 'Pilih class (atau ganti class box terpilih)'],
+  ['1-9', 'Pilih class (atau ganti class box terpilih)'],
   ['Del', 'Hapus box terpilih'],
   ['Enter', 'Approve semua box & lanjut'],
   ['Ctrl+Z', 'Undo'],

@@ -17,9 +17,9 @@ import { useProjectId } from '../../lib/route'
 const MODE_LABELS: Record<string, string> = {
   text: 'Teks (text prompt)',
   image_guided: 'Contoh visual (exemplar)',
-  'grounding_dino:text': 'Grounding DINO — teks',
-  'owlv2:text': 'OWLv2 — teks',
-  'owlv2:image_guided': 'OWLv2 — contoh visual',
+  'grounding_dino:text': 'Grounding DINO (teks)',
+  'owlv2:text': 'OWLv2 (teks)',
+  'owlv2:image_guided': 'OWLv2 (contoh visual)',
 }
 
 type Params = Record<string, number | boolean>
@@ -180,7 +180,7 @@ export function AutolabelTab() {
               <option key={p.name} value={p.name} disabled={!p.available}>
                 {p.label}
                 {p.is_default ? ' (default)' : ''}
-                {!p.available ? ` — ${p.unavailable_reason}` : ''}
+                {!p.available ? ` (${p.unavailable_reason})` : ''}
               </option>
             ))}
           </select>

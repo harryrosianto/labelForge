@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 /** Brand bar: logo Syspex + nama aplikasi. `children` = konten kanan (breadcrumb, aksi). */
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link to="/" className="flex shrink-0 items-center gap-3" title="LabelForge — semua project">
+    <Link to="/" className="flex shrink-0 items-center gap-3" title="LabelForge: semua project">
       <img src="/syspex-logo.png" alt="Syspex" className={compact ? 'h-4' : 'h-6'} />
       <span className="h-5 w-px bg-slate-300" />
       <span className={`font-semibold tracking-tight text-ink ${compact ? 'text-sm' : 'text-base'}`}>

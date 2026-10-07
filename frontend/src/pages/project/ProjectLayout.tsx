@@ -21,7 +21,7 @@ function WorkerStatus() {
   return (
     <span className={`flex items-center gap-1.5 text-xs ${ok ? 'text-emerald-700' : 'text-amber-700'}`}>
       <span className={`h-2 w-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-      {ok ? 'Worker aktif' : 'Worker tidak aktif — job auto-label akan menunggu'}
+      {ok ? 'Worker aktif' : 'Worker tidak aktif, job auto-label akan menunggu'}
     </span>
   )
 }

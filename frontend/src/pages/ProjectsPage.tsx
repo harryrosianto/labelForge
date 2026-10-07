@@ -75,7 +75,7 @@ export function ProjectsPage() {
             <Link to={`/projects/${p.id}`} className="text-lg font-semibold text-ink hover:text-brand-700">
               {p.name}
             </Link>
-            <p className="mt-1 line-clamp-2 min-h-10 text-sm text-slate-500">{p.description || '—'}</p>
+            <p className="mt-1 line-clamp-2 min-h-10 text-sm text-slate-500">{p.description || 'Tanpa deskripsi'}</p>
             <p className="mt-3 text-sm text-slate-600">
               {p.image_count} gambar · {p.class_count} class
             </p>

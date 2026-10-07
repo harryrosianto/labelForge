@@ -124,7 +124,7 @@ class LabelingProvider(ABC):
 
     @classmethod
     def is_available(cls) -> tuple[bool, str | None]:
-        """(tersedia, alasan jika tidak). Hanya cek konfigurasi — proses web tidak memasang
+        """(tersedia, alasan jika tidak). Hanya cek konfigurasi, karena proses web tidak memasang
         torch, jadi dependency ML dicek saat `load()` di worker (lihat `require_ml_deps`)."""
         return True, None
 

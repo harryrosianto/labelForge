@@ -3,7 +3,7 @@
 Jalankan worker (satu proses, model di-load sekali & tetap di memori):
     celery -A labelforge.worker.celery_app worker --pool=solo --concurrency=1 -Q inference
 
-Queue per jenis pekerjaan (`inference`, nanti `training` di Fase 3) supaya bisa
+Queue per jenis pekerjaan (mis. `inference`, `training`) supaya bisa
 dijalankan di mesin berbeda.
 """
 

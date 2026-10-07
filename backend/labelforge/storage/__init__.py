@@ -7,7 +7,7 @@ from labelforge.storage.local import LocalStorage
 
 @lru_cache
 def get_storage() -> StorageBackend:
-    """Backend storage aktif. Nanti dipilih via config (mis. STORAGE_BACKEND=s3)."""
+    """Backend storage aktif. Backend lain (mis. S3/MinIO) cukup mengimplementasikan StorageBackend."""
     return LocalStorage(get_settings().data_dir)
 
 

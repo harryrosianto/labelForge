@@ -1,6 +1,6 @@
 """Inference server HTTP: menjalankan provider lokal untuk dipanggil RemoteApiProvider.
 
-Tidak butuh DB maupun storage LabelForge — cukup gambar + daftar class per request.
+Tidak butuh DB maupun storage LabelForge; cukup gambar + daftar class per request.
 Kontrak lengkap ada di docstring `labelforge.providers.remote_api`.
 """
 

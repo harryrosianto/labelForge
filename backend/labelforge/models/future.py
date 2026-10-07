@@ -1,4 +1,4 @@
-"""Tabel untuk Fase 2-3. Schema saja; fiturnya belum diimplementasikan."""
+"""Tabel untuk Fase 2-3 (dataset versioning & model registry)."""
 
 from datetime import datetime
 

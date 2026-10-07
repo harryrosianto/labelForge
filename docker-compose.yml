@@ -1,4 +1,4 @@
-# LabelForge — jalankan semua service:
+# LabelForge: jalankan semua service
 #   docker compose up -d --build            (CPU)
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build   (GPU NVIDIA)
 # Buka http://localhost:8080 (ubah dengan LABELFORGE_PORT).
