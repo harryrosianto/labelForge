@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
 
     # Inference
+    # OWLv2 teks dipilih sebagai default setelah uji di foto CCTV gudang: lebih akurat untuk
+    # pallet dan ~2.5x lebih cepat dari Grounding DINO base di CPU.
+    default_provider: str = "owlv2"
+    default_mode: str = "text"
     device: str = "auto"  # auto | cpu | cuda | cuda:N
     use_fp16: bool = False
     gdino_model_id: str = "IDEA-Research/grounding-dino-base"
@@ -25,6 +29,7 @@ class Settings(BaseSettings):
     gdino_text_threshold: float = 0.25
     owlv2_model_id: str = "google/owlv2-base-patch16-ensemble"
     owlv2_score_threshold: float = 0.2
+    owlv2_image_score_threshold: float = 0.65
     owlv2_nms_threshold: float = 0.3
     nms_iou_threshold: float = 0.5
 
@@ -32,6 +37,8 @@ class Settings(BaseSettings):
     remote_inference_url: str | None = None
     remote_inference_token: str | None = None
     remote_inference_timeout: float = 120.0
+    # Token yang diwajibkan oleh inference server ini sendiri (kosong = tanpa auth)
+    inference_server_token: str | None = None
 
     # Upload
     thumbnail_size: int = 320
