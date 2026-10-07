@@ -2,7 +2,10 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { api, json, queryString } from './client'
 import type {
+  Exemplar,
   Health,
+  ImageDetail,
+  ImageItem,
   ImagePage,
   ImageFilters,
   Job,
@@ -193,5 +196,66 @@ export function useCancelJob(projectId: number) {
   return useMutation({
     mutationFn: (jobId: number) => api<Job>(`/jobs/${jobId}/cancel`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.jobs(projectId) }),
+  })
+}
+
+// --- editor & exemplars ----------------------------------------------------
+
+export const useImageDetail = (imageId: number, filters: ImageFilters) =>
+  useQuery({
+    queryKey: ['image', imageId, filters],
+    queryFn: () => api<ImageDetail>(`/images/${imageId}${queryString(filters)}`),
+  })
+
+export interface AnnotationPayload {
+  id: number | null
+  class_id: number
+  x_min: number
+  y_min: number
+  x_max: number
+  y_max: number
+  is_approved: boolean
+}
+
+export function useSaveAnnotations(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ imageId, annotations, approve }: { imageId: number; annotations: AnnotationPayload[]; approve: boolean }) =>
+      api<ImageItem>(`/images/${imageId}/annotations`, json('PUT', { annotations, approve })),
+    onSuccess: (_data, { imageId }) => {
+      qc.invalidateQueries({ queryKey: ['image', imageId] })
+      qc.invalidateQueries({ queryKey: keys.images(projectId) })
+      qc.invalidateQueries({ queryKey: keys.stats(projectId) })
+      qc.invalidateQueries({ queryKey: keys.classes(projectId) })
+    },
+  })
+}
+
+export const useExemplars = (classId: number, enabled = true) =>
+  useQuery({
+    queryKey: ['exemplars', classId],
+    queryFn: () => api<Exemplar[]>(`/classes/${classId}/exemplars`),
+    enabled,
+  })
+
+export function useCreateExemplar(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (annotationId: number) => api<Exemplar>(`/annotations/${annotationId}/exemplar`, { method: 'POST' }),
+    onSuccess: (ex) => {
+      qc.invalidateQueries({ queryKey: ['exemplars', ex.class_id] })
+      qc.invalidateQueries({ queryKey: keys.classes(projectId) })
+    },
+  })
+}
+
+export function useDeleteExemplar(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ex: Exemplar) => api<void>(`/exemplars/${ex.id}`, { method: 'DELETE' }),
+    onSuccess: (_d, ex) => {
+      qc.invalidateQueries({ queryKey: ['exemplars', ex.class_id] })
+      qc.invalidateQueries({ queryKey: keys.classes(projectId) })
+    },
   })
 }

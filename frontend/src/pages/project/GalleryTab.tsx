@@ -101,8 +101,8 @@ export function GalleryTab() {
       </div>
 
       {selected.size > 0 && (
-        <div className="flex items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm">
-          <span className="font-medium text-indigo-800">{selected.size} dipilih</span>
+        <div className="flex items-center gap-2 rounded-md bg-brand-50 px-3 py-2 text-sm">
+          <span className="font-medium text-brand-800">{selected.size} dipilih</span>
           <Button
             variant="primary"
             onClick={() => navigate('../autolabel', { relative: 'path', state: { imageIds: [...selected] } })}
@@ -137,7 +137,7 @@ export function GalleryTab() {
           {params.toString() ? (
             'Tidak ada gambar yang cocok dengan filter.'
           ) : (
-            <Link to="../upload" relative="path" className="text-indigo-600">
+            <Link to="../upload" relative="path" className="text-brand-700">
               Upload gambar
             </Link>
           )}

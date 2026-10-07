@@ -1,11 +1,64 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
-import { useClasses, useCreateClass, useDeleteClass, useReorderClasses, useUpdateClass } from '../../api/hooks'
+import {
+  useClasses,
+  useCreateClass,
+  useDeleteClass,
+  useDeleteExemplar,
+  useExemplars,
+  useReorderClasses,
+  useUpdateClass,
+} from '../../api/hooks'
 import type { LabelClass } from '../../api/types'
 import { Button, ErrorText, inputClass, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
 
 const PROMPT_HINT = 'Deskripsi untuk model; pisahkan sinonim dengan koma, mis. "wooden pallet, plastic pallet"'
+
+function ExemplarStrip({ cls }: { cls: LabelClass }) {
+  const { data: exemplars, isLoading } = useExemplars(cls.id)
+  const remove = useDeleteExemplar(cls.project_id)
+  return (
+    <tr>
+      <td colSpan={7} className="bg-slate-50 px-4 py-3">
+        {isLoading && <Spinner />}
+        <div className="flex flex-wrap gap-3">
+          {exemplars?.map((ex) => (
+            <figure key={ex.id} className="group relative">
+              <img
+                src={`/api/exemplars/${ex.id}/image`}
+                alt={`Contoh ${cls.name}`}
+                className="h-20 w-auto rounded border border-slate-200 bg-white object-contain"
+              />
+              <figcaption className="mt-0.5 text-center text-xs text-slate-500">
+                {ex.source_image_id ? (
+                  <Link className="hover:text-brand-700" to={`/projects/${cls.project_id}/annotate/${ex.source_image_id}`}>
+                    {ex.width}×{ex.height}
+                  </Link>
+                ) : (
+                  `${ex.width}×${ex.height}`
+                )}
+              </figcaption>
+              <button
+                type="button"
+                onClick={() => remove.mutate(ex)}
+                className="absolute -right-2 -top-2 hidden h-5 w-5 rounded-full bg-rose-600 text-xs text-white group-hover:block"
+                aria-label="Hapus contoh visual"
+              >
+                ×
+              </button>
+            </figure>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Dipakai mode “contoh visual” OWLv2. Pilih box yang pas di objek (tanpa objek lain menempel) agar hasilnya bagus.
+        </p>
+        <ErrorText error={remove.error} />
+      </td>
+    </tr>
+  )
+}
 
 function ClassRow({
   cls,
@@ -23,12 +76,14 @@ function ClassRow({
   const remove = useDeleteClass(id)
   const [name, setName] = useState(cls.name)
   const [prompt, setPrompt] = useState(cls.text_prompt ?? '')
+  const [showExemplars, setShowExemplars] = useState(false)
 
   const commitName = () => name.trim() && name !== cls.name && update.mutate({ id: cls.id, name })
   const commitPrompt = () =>
     prompt !== (cls.text_prompt ?? '') && update.mutate({ id: cls.id, text_prompt: prompt.trim() || null })
 
   return (
+    <>
     <tr className="border-t border-slate-100 align-top">
       <td className="py-2 pr-2 text-sm text-slate-400 tabular-nums" title="Index class di YOLO / shortcut">
         {index + 1}
@@ -63,7 +118,15 @@ function ClassRow({
         <ErrorText error={update.error ?? remove.error} />
       </td>
       <td className="py-2 pr-2 text-right text-sm tabular-nums text-slate-600">{cls.annotation_count}</td>
-      <td className="py-2 pr-2 text-right text-sm tabular-nums text-slate-600">{cls.exemplar_count}</td>
+      <td className="py-2 pr-2 text-right text-sm tabular-nums text-slate-600">
+        {cls.exemplar_count > 0 ? (
+          <button type="button" className="text-brand-700 hover:underline" onClick={() => setShowExemplars(!showExemplars)}>
+            {cls.exemplar_count} {showExemplars ? '▴' : '▾'}
+          </button>
+        ) : (
+          0
+        )}
+      </td>
       <td className="whitespace-nowrap py-2 text-right">
         <Button variant="ghost" disabled={index === 0} onClick={() => onMove(index, index - 1)} aria-label="Naik">
           ↑
@@ -90,6 +153,8 @@ function ClassRow({
         </Button>
       </td>
     </tr>
+    {showExemplars && cls.exemplar_count > 0 && <ExemplarStrip cls={cls} />}
+    </>
   )
 }
 

@@ -8,7 +8,7 @@ export const IMAGE_STATUS: Record<ImageStatus, [label: string, className: string
 
 export const JOB_STATUS: Record<JobStatus, [label: string, className: string]> = {
   queued: ['Antre', 'bg-slate-100 text-slate-600'],
-  running: ['Berjalan', 'bg-indigo-100 text-indigo-700'],
+  running: ['Berjalan', 'bg-brand-100 text-brand-800'],
   completed: ['Selesai', 'bg-emerald-100 text-emerald-800'],
   failed: ['Gagal', 'bg-rose-100 text-rose-700'],
   cancelled: ['Dibatalkan', 'bg-slate-200 text-slate-600'],

@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 
 import { useHealth, useProject } from '../../api/hooks'
+import { Brand } from '../../components/AppHeader'
 import { ErrorText, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
 
@@ -31,12 +32,14 @@ export function ProjectLayout() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-6 pt-4">
-          <Link to="/" className="text-sm text-slate-500 hover:text-slate-800">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-6">
+          <Brand />
+          <span className="ml-3 text-slate-300">/</span>
+          <Link to="/" className="text-sm text-slate-500 hover:text-brand-700">
             Projects
           </Link>
           <span className="text-slate-300">/</span>
-          <h1 className="text-lg font-semibold">{isLoading ? <Spinner /> : project?.name}</h1>
+          <h1 className="text-lg font-semibold text-ink">{isLoading ? <Spinner /> : project?.name}</h1>
           <div className="ml-auto">
             <WorkerStatus />
           </div>
@@ -50,8 +53,8 @@ export function ProjectLayout() {
               className={({ isActive }) =>
                 `border-b-2 px-3 py-2.5 text-sm font-medium ${
                   isActive
-                    ? 'border-indigo-600 text-indigo-700'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'border-brand-500 text-brand-700'
+                    : 'border-transparent text-slate-500 hover:text-ink'
                 }`
               }
             >

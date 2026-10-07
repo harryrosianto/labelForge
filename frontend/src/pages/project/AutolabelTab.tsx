@@ -43,7 +43,7 @@ function ParamInput({ spec, value, onChange }: { spec: ParamSpec; value: number 
         {isSlider && (
           <input
             type="range"
-            className="flex-1 accent-indigo-600"
+            className="flex-1 accent-brand-600"
             min={spec.min ?? 0}
             max={spec.max ?? 1}
             step={spec.step ?? 0.01}
@@ -93,7 +93,7 @@ function JobRow({ job }: { job: Job }) {
       </div>
       {(active || job.status === 'cancelled') && (
         <div className="mt-2 h-2 rounded bg-slate-100">
-          <div className="h-2 rounded bg-indigo-500 transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-2 rounded bg-brand-500 transition-all" style={{ width: `${pct}%` }} />
         </div>
       )}
       {job.status === 'queued' && (

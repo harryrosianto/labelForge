@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { useDeleteProject, useProjects, useSaveProject } from '../api/hooks'
 import type { Project } from '../api/types'
+import { AppHeader } from '../components/AppHeader'
 import { Button, EmptyState, ErrorText, Field, inputClass, Modal, Spinner } from '../components/ui'
 
 function ProjectForm({ project, onClose }: { project?: Project; onClose: () => void }) {
@@ -49,9 +50,14 @@ export function ProjectsPage() {
   const [editing, setEditing] = useState<Project | 'new' | null>(null)
 
   return (
+    <>
+    <AppHeader />
     <div className="mx-auto max-w-5xl p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Projects</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">Projects</h1>
+          <p className="text-sm text-slate-500">Dataset object detection dengan auto-labeling AI</p>
+        </div>
         <Button variant="primary" onClick={() => setEditing('new')}>
           + Project baru
         </Button>
@@ -65,8 +71,8 @@ export function ProjectsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {projects?.map((p) => (
-          <div key={p.id} className="flex flex-col rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <Link to={`/projects/${p.id}`} className="text-lg font-semibold hover:text-indigo-600">
+          <div key={p.id} className="flex flex-col rounded-lg border-t-4 border-brand-500 bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <Link to={`/projects/${p.id}`} className="text-lg font-semibold text-ink hover:text-brand-700">
               {p.name}
             </Link>
             <p className="mt-1 line-clamp-2 min-h-10 text-sm text-slate-500">{p.description || '—'}</p>
@@ -74,7 +80,7 @@ export function ProjectsPage() {
               {p.image_count} gambar · {p.class_count} class
             </p>
             <div className="mt-3 flex gap-1 border-t border-slate-100 pt-3">
-              <Link to={`/projects/${p.id}`} className="mr-auto text-sm font-medium text-indigo-600">
+              <Link to={`/projects/${p.id}`} className="mr-auto text-sm font-medium text-brand-700">
                 Buka →
               </Link>
               <Button variant="ghost" onClick={() => setEditing(p)}>
@@ -99,5 +105,6 @@ export function ProjectsPage() {
         <ProjectForm project={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />
       )}
     </div>
+    </>
   )
 }

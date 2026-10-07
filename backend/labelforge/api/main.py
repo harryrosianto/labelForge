@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from labelforge import __version__
 from labelforge.api.deps import DbSession
-from labelforge.api.routers import classes, images, jobs, projects
+from labelforge.api.routers import annotations, classes, images, jobs, projects
 from labelforge.config import get_settings
 from labelforge.worker.queue import JobQueue, get_job_queue
 
@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (projects, classes, images, jobs):
+    for module in (projects, classes, images, annotations, jobs):
         app.include_router(module.router, prefix="/api")
 
     @app.get("/api/health", tags=["health"])

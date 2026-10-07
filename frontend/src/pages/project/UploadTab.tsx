@@ -86,7 +86,7 @@ export function UploadTab() {
           start(Array.from(e.dataTransfer.files))
         }}
         className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center
-          ${dragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-white'}`}
+          ${dragging ? 'border-brand-500 bg-brand-50' : 'border-slate-300 bg-white'}`}
       >
         <p className="text-lg font-medium">Tarik & lepas gambar atau file ZIP di sini</p>
         <p className="mt-1 text-sm text-slate-500">JPG, PNG, BMP, WEBP, TIFF, atau ZIP berisi gambar</p>
@@ -112,7 +112,7 @@ export function UploadTab() {
             <Spinner /> Mengunggah batch {Math.min(progress.done + 1, progress.total)} dari {progress.total}…
           </div>
           <div className="h-2 rounded bg-slate-100">
-            <div className="h-2 rounded bg-indigo-500" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+            <div className="h-2 rounded bg-brand-500" style={{ width: `${(progress.done / progress.total) * 100}%` }} />
           </div>
         </div>
       )}
@@ -127,10 +127,10 @@ export function UploadTab() {
           <IssueList title="Gagal" items={summary.errors} className="text-rose-600" />
           {summary.uploaded > 0 && !progress && (
             <div className="flex gap-3 pt-2 text-sm">
-              <Link to="../gallery" relative="path" className="font-medium text-indigo-600">
+              <Link to="../gallery" relative="path" className="font-medium text-brand-700">
                 Lihat galeri →
               </Link>
-              <Link to="../autolabel" relative="path" className="font-medium text-indigo-600">
+              <Link to="../autolabel" relative="path" className="font-medium text-brand-700">
                 Jalankan auto-label →
               </Link>
             </div>

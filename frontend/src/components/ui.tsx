@@ -3,7 +3,7 @@ import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react'
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost'
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-indigo-300',
+  primary: 'bg-brand-700 text-white shadow-sm hover:bg-brand-800 disabled:bg-brand-200',
   secondary: 'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:text-slate-400',
   danger: 'bg-rose-600 text-white hover:bg-rose-500 disabled:bg-rose-300',
   ghost: 'text-slate-600 hover:bg-slate-100 disabled:text-slate-300',
@@ -78,7 +78,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 }
 
 export const inputClass =
-  'w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+  'w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500'
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (

@@ -153,3 +153,13 @@ export interface ImageFilters {
   source?: string
   max_conf?: number
 }
+
+export interface Exemplar {
+  id: number
+  class_id: number
+  source_image_id: number | null
+  source_annotation_id: number | null
+  width: number
+  height: number
+  created_at: string
+}

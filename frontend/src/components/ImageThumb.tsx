@@ -20,7 +20,7 @@ export function ImageThumb({
   return (
     <div
       className={`group relative overflow-hidden rounded-md bg-slate-200 ring-2 transition
-        ${selected ? 'ring-indigo-500' : 'ring-transparent hover:ring-slate-300'}`}
+        ${selected ? 'ring-brand-500' : 'ring-transparent hover:ring-slate-300'}`}
     >
       <button type="button" className="block w-full" onClick={onOpen} title={image.original_filename}>
         <div className="relative w-full" style={{ aspectRatio: ratio }}>
@@ -53,7 +53,7 @@ export function ImageThumb({
         checked={selected}
         onChange={onToggle}
         aria-label={`Pilih ${image.original_filename}`}
-        className={`absolute left-2 top-2 h-4 w-4 cursor-pointer accent-indigo-600
+        className={`absolute left-2 top-2 h-4 w-4 cursor-pointer accent-brand-600
           ${selected ? '' : 'opacity-0 group-hover:opacity-100'}`}
       />
       <div className="flex items-center justify-between gap-1 bg-white px-2 py-1">

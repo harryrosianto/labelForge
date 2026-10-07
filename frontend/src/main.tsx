@@ -35,7 +35,7 @@ const router = createBrowserRouter([
     path: '*',
     element: (
       <div className="p-10 text-center">
-        Halaman tidak ditemukan. <Link to="/" className="text-indigo-600">Kembali</Link>
+        Halaman tidak ditemukan. <Link to="/" className="text-brand-700">Kembali</Link>
       </div>
     ),
   },

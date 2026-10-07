@@ -16,7 +16,7 @@ function Stat({ label, value, to }: { label: string; value: number; to?: string 
   )
   const cls = 'block rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200'
   return to ? (
-    <Link to={to} className={`${cls} hover:ring-indigo-300`}>
+    <Link to={to} className={`${cls} hover:ring-brand-300`}>
       {body}
     </Link>
   ) : (
@@ -34,8 +34,8 @@ export function OverviewTab() {
   if (stats.total_images === 0)
     return (
       <EmptyState title="Project masih kosong">
-        Tambahkan <Link to="classes" className="text-indigo-600">class</Link> lalu{' '}
-        <Link to="upload" className="text-indigo-600">upload gambar</Link>.
+        Tambahkan <Link to="classes" className="text-brand-700">class</Link> lalu{' '}
+        <Link to="upload" className="text-brand-700">upload gambar</Link>.
       </EmptyState>
     )
 
