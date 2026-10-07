@@ -124,7 +124,8 @@ class LabelingProvider(ABC):
 
     @classmethod
     def is_available(cls) -> tuple[bool, str | None]:
-        """(tersedia, alasan jika tidak). Cek dependency/konfigurasi tanpa me-load model."""
+        """(tersedia, alasan jika tidak). Hanya cek konfigurasi — proses web tidak memasang
+        torch, jadi dependency ML dicek saat `load()` di worker (lihat `require_ml_deps`)."""
         return True, None
 
     @classmethod
@@ -201,6 +202,20 @@ class LabelingProvider(ABC):
         per_class = p.get(self.per_class_nms_param) if self.per_class_nms_param else None
         agnostic = p["class_agnostic_iou"] if p["class_agnostic_nms"] else None
         return apply_nms(cleaned, per_class, agnostic)
+
+
+def require_ml_deps(*modules: str) -> None:
+    """Pastikan library ML terpasang; pesan error jelas jika dijalankan di proses tanpa torch."""
+    import importlib
+
+    for module in modules:
+        try:
+            importlib.import_module(module)
+        except ImportError as e:
+            raise ProviderError(
+                f"Dependency ML '{module}' belum terpasang di proses ini. "
+                "Jalankan di worker, atau pip install -e .[ml]"
+            ) from e
 
 
 def load_image(path: str | Path) -> Image.Image:

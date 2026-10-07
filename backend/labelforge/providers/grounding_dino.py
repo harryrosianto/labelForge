@@ -3,7 +3,13 @@ from typing import Any
 from PIL import Image
 
 from labelforge.config import get_settings
-from labelforge.providers.base import ClassDef, Detection, LabelingProvider, ParamSpec
+from labelforge.providers.base import (
+    ClassDef,
+    Detection,
+    LabelingProvider,
+    ParamSpec,
+    require_ml_deps,
+)
 from labelforge.providers.gdino_mapping import build_prompt, map_label_to_class, split_batches
 from labelforge.providers.registry import register_provider
 
@@ -30,16 +36,8 @@ class GroundingDinoProvider(LabelingProvider):
                       min=0.05, max=1.0, step=0.05),
         ]  # fmt: skip
 
-    @classmethod
-    def is_available(cls) -> tuple[bool, str | None]:
-        try:
-            import torch  # noqa: F401
-            import transformers  # noqa: F401
-        except ImportError as e:
-            return False, f"dependency ML belum terpasang ({e.name}); pip install -e .[ml]"
-        return True, None
-
     def _load(self) -> None:
+        require_ml_deps("torch", "transformers")
         import torch
         from transformers import AutoModelForZeroShotObjectDetection, AutoProcessor
 

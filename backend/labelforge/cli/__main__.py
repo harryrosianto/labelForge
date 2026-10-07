@@ -170,6 +170,31 @@ def cmd_detect(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_import_images(args) -> int:
+    from labelforge.db import get_session_factory
+    from labelforge.models import Project
+    from labelforge.services.images import InvalidImageError, ingest_image
+    from labelforge.storage import get_storage
+
+    storage = get_storage()
+    added = duplicates = failed = 0
+    with get_session_factory()() as db:
+        if db.get(Project, args.project_id) is None:
+            raise SystemExit(f"Project {args.project_id} tidak ditemukan")
+        for path in _list_images(Path(args.input)):
+            try:
+                res = ingest_image(db, storage, args.project_id, path.name, path.read_bytes())
+            except InvalidImageError as e:
+                failed += 1
+                print(f"[gagal] {e}")
+                continue
+            db.commit()
+            duplicates += res.duplicate
+            added += not res.duplicate
+    print(f"Ditambahkan {added}, duplikat {duplicates}, gagal {failed}")
+    return 0
+
+
 def cmd_providers(_args) -> int:
     for p in describe_providers():
         status = "tersedia" if p["available"] else f"TIDAK tersedia: {p['unavailable_reason']}"
@@ -204,6 +229,11 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--fp16", action="store_true", help="fp16 (hanya berlaku di CUDA)")
     d.add_argument("--limit", type=int, help="Proses N gambar pertama saja")
     d.set_defaults(func=cmd_detect)
+
+    i = sub.add_parser("import-images", help="Impor folder gambar ke project (pakai DB & storage)")
+    i.add_argument("--project-id", type=int, required=True)
+    i.add_argument("--input", required=True)
+    i.set_defaults(func=cmd_import_images)
 
     p = sub.add_parser("providers", help="Daftar provider dan parameternya")
     p.set_defaults(func=cmd_providers)

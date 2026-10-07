@@ -4,6 +4,7 @@ from PIL import Image
 
 from labelforge.config import get_settings
 from labelforge.providers.base import (
+    require_ml_deps,
     ClassDef,
     Detection,
     LabelingProvider,
@@ -42,16 +43,6 @@ class Owlv2Provider(LabelingProvider):
         return specs
 
     @classmethod
-    def is_available(cls) -> tuple[bool, str | None]:
-        try:
-            import torch  # noqa: F401
-            import torchvision  # noqa: F401
-            import transformers  # noqa: F401
-        except ImportError as e:
-            return False, f"dependency ML belum terpasang ({e.name}); pip install -e .[ml]"
-        return True, None
-
-    @classmethod
     def source_tag(cls, mode: str) -> str:
         return "ai:owlv2_image" if mode == IMAGE_GUIDED else "ai:owlv2_text"
 
@@ -66,6 +57,7 @@ class Owlv2Provider(LabelingProvider):
         ]
 
     def _load(self) -> None:
+        require_ml_deps("torch", "torchvision", "transformers")
         import torch
         from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
