@@ -1,0 +1,78 @@
+# LabelForge — jalankan semua service:
+#   docker compose up -d --build            (CPU)
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build   (GPU NVIDIA)
+# Buka http://localhost:8080 (ubah dengan LABELFORGE_PORT).
+
+name: labelforge
+
+x-backend-env: &backend-env
+  DATABASE_URL: sqlite:////data/labelforge.db
+  DATA_DIR: /data
+  REDIS_URL: redis://redis:6379/0
+  HF_HOME: /hf_cache
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./backend
+      target: web
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *backend-env
+    volumes:
+      - data:/data
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      target: worker
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *backend-env
+    volumes:
+      - data:/data
+      # Cache model HuggingFace agar tidak di-download ulang. Default: named volume.
+      # Untuk memakai cache yang sudah ada di host: HF_CACHE_DIR=/path/ke/.cache/huggingface
+      - ${HF_CACHE_DIR:-hf_cache}:/hf_cache
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${LABELFORGE_PORT:-8080}:80"
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+# Data (SQLite + gambar) di named volume: web & worker berbagi SQLite mode WAL, dan file
+# locking WAL tidak andal lewat bind mount folder Windows/macOS di Docker Desktop.
+volumes:
+  data:
+  hf_cache:
+  redis_data:

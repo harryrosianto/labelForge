@@ -8,6 +8,7 @@ import { EditorPage } from './pages/EditorPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { AutolabelTab } from './pages/project/AutolabelTab'
 import { ClassesTab } from './pages/project/ClassesTab'
+import { ExportTab } from './pages/project/ExportTab'
 import { GalleryTab } from './pages/project/GalleryTab'
 import { OverviewTab } from './pages/project/OverviewTab'
 import { ProjectLayout } from './pages/project/ProjectLayout'
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { path: 'upload', element: <UploadTab /> },
       { path: 'gallery', element: <GalleryTab /> },
       { path: 'autolabel', element: <AutolabelTab /> },
+      { path: 'export', element: <ExportTab /> },
     ],
   },
   { path: '/projects/:projectId/annotate/:imageId', element: <EditorPage /> },

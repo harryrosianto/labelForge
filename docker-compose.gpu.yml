@@ -1,0 +1,20 @@
+# Override untuk worker di GPU NVIDIA (butuh NVIDIA driver + NVIDIA Container Toolkit,
+# atau Docker Desktop + WSL2 di Windows):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+# Driver terbaru (CUDA 13): TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
+
+services:
+  worker:
+    build:
+      args:
+        TORCH_INDEX_URL: ${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu126}
+    environment:
+      DEVICE: cuda
+      USE_FP16: ${USE_FP16:-true}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

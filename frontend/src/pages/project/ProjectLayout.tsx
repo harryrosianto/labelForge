@@ -11,6 +11,7 @@ const tabs = [
   ['upload', 'Upload'],
   ['gallery', 'Galeri'],
   ['autolabel', 'Auto-label'],
+  ['export', 'Export'],
 ] as const
 
 function WorkerStatus() {
