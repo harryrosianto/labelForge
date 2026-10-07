@@ -6,8 +6,7 @@ difokuskan untuk kamera CCTV gudang (pallet, kardus, orang, forklift).
 Alur: **project → class (text prompt / contoh visual) → upload gambar → auto-label AI →
 review & koreksi di editor → export YOLO / COCO.**
 
-Roadmap fase berikutnya ada di [ROADMAP.md](ROADMAP.md); spesifikasi Fase 1 di
-[docs/SPEC_FASE1.md](docs/SPEC_FASE1.md).
+Roadmap fase berikutnya ada di [ROADMAP.md](ROADMAP.md).
 
 ## Arsitektur
 

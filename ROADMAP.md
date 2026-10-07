@@ -1,7 +1,5 @@
 # LabelForge Roadmap
 
-Spesifikasi lengkap Fase 1: [docs/SPEC_FASE1.md](docs/SPEC_FASE1.md).
-
 ## Fase 1 – MVP Auto Labeling (sedang dikerjakan)
 Project & class management (text prompt + exemplar visual), upload gambar (multi-file/ZIP,
 thumbnail, deteksi duplikat), auto-labeling zero-shot (Grounding DINO, OWLv2 text &

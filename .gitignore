@@ -19,3 +19,6 @@ backend/out/
 *.db
 *.db-wal
 *.db-shm
+
+# Prompt/spesifikasi kerja per fase (catatan lokal, tidak di-commit)
+docs/prompts/
