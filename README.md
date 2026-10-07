@@ -1,6 +1,6 @@
 # LabelForge
 
-Web platform untuk membuat dataset object detection dengan auto-labeling AI — mirip Roboflow,
+Web platform untuk membuat dataset object detection dengan auto-labeling AI,
 difokuskan untuk kamera CCTV gudang (pallet, kardus, orang, forklift).
 
 Alur: **project → class (text prompt / contoh visual) → upload gambar → auto-label AI →
@@ -153,20 +153,20 @@ Opsi lain: `--param class_agnostic_nms=true`, `--device cpu|cuda`, `--fp16`, `--
 
 ## Menggunakan aplikasi
 
-1. **Classes** — tambah class; isi *text prompt* deskriptif (sinonim dipisah koma). Urutan
+1. **Classes**: tambah class; isi *text prompt* deskriptif (sinonim dipisah koma). Urutan
    class = index class di YOLO dan shortcut angka di editor.
-2. **Upload** — drag & drop gambar atau ZIP. Duplikat (hash sama) otomatis dilewati;
+2. **Upload**: drag & drop gambar atau ZIP. Duplikat (hash sama) otomatis dilewati;
    orientasi EXIF diterapkan.
-3. **Auto-label** — pilih model, mode & threshold; target: belum berlabel / semua / terpilih
+3. **Auto-label**: pilih model, mode & threshold; target: belum berlabel / semua / terpilih
    dari galeri. Box AI yang belum di-approve diganti setiap job; box manual & yang sudah
    di-approve tidak disentuh.
-4. **Galeri → editor** — filter status / class / sumber / confidence rendah, lalu review:
+4. **Galeri → editor**: filter status / class / sumber / confidence rendah, lalu review:
 
    | Tombol | Aksi |
    |---|---|
    | ← / → | gambar sebelumnya / berikutnya (otomatis simpan) |
    | drag di area kosong | gambar box dengan class aktif |
-   | 1–9 | pilih class (atau ganti class box terpilih) |
+   | 1-9 | pilih class (atau ganti class box terpilih) |
    | Del | hapus box |
    | Enter | approve semua box → `reviewed`, lanjut |
    | Ctrl+Z / Ctrl+S | undo / simpan |
@@ -174,7 +174,7 @@ Opsi lain: `--param class_agnostic_nms=true`, `--device cpu|cuda`, `--fp16`, `--
 
    Box AI bergaris putus-putus + confidence sampai di-approve atau diedit. **Jadikan contoh
    visual** menyimpan crop box terpilih untuk mode image-guided OWLv2.
-5. **Export** — YOLO (`images/`, `labels/`, `data.yaml`) atau COCO JSON, split train/val/test
+5. **Export**: YOLO (`images/`, `labels/`, `data.yaml`) atau COCO JSON, split train/val/test
    dengan seed. Default hanya gambar `reviewed`; gambar `unlabeled` tidak pernah diekspor
    (tanpa label ia akan terbaca sebagai gambar tanpa objek). Gambar reviewed tanpa box
    diekspor dengan file label kosong sebagai contoh negatif.
@@ -215,13 +215,13 @@ Contoh: model YOLO hasil training sendiri (Fase 3) atau API lain.
    ```
 
 2. Tambahkan modulnya ke `BUILTIN_MODULES` di `providers/registry.py`.
-3. Selesai — provider muncul di dropdown Auto-label, CLI (`--provider my_model`) dan inference
+3. Selesai. Provider muncul di dropdown Auto-label, CLI (`--provider my_model`) dan inference
    server. Clip ke batas gambar, filter ukuran minimum, dan NMS per class / antar-class
    ditangani otomatis oleh `LabelingProvider`.
 
 Override opsional: `is_available()` (cek konfigurasi), `source_tag(mode)`,
 `class_warnings(mode, classes)` (peringatan sebelum job, mis. class tanpa exemplar).
-Import library berat di dalam `_load()`/`_detect()`, bukan di level modul — proses web tidak
+Import library berat di dalam `_load()`/`_detect()`, bukan di level modul, karena proses web tidak
 memasang torch.
 
 ## Inference di mesin GPU lain
@@ -266,4 +266,4 @@ frontend/src/
   api/ components/ lib/
 ```
 
-Tabel `dataset_versions` dan `models` sudah ada di schema untuk Fase 2–3, fiturnya belum.
+Tabel `dataset_versions` dan `models` sudah ada di schema untuk Fase 2 dan 3, fiturnya belum.

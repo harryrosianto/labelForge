@@ -1,4 +1,4 @@
-# LabelForge — Roadmap
+# LabelForge Roadmap
 
 Spesifikasi lengkap Fase 1: [docs/SPEC_FASE1.md](docs/SPEC_FASE1.md).
 
