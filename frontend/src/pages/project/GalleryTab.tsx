@@ -129,7 +129,13 @@ export function GalleryTab() {
             disabled={remove.isPending}
             onClick={() => {
               if (confirm(`Hapus ${selected.size} gambar beserta labelnya?`))
-                remove.mutate([...selected], { onSuccess: () => setSelected(new Set()) })
+                remove.mutate([...selected], {
+                  onSuccess: (r) => {
+                    setSelected(new Set())
+                    if (r.protected.length)
+                      alert(`${r.protected.length} gambar tidak dihapus karena dipakai versi dataset. Hapus versinya dulu bila perlu.`)
+                  },
+                })
             }}
           >
             Hapus

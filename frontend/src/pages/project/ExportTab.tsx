@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { ApiError, api, json } from '../../api/client'
+import { api, json } from '../../api/client'
 import { useProject } from '../../api/hooks'
 import { Button, ErrorText, Field, inputClass, Spinner } from '../../components/ui'
+import { downloadPost } from '../../lib/download'
 import { useProjectId } from '../../lib/route'
 
 type Format = 'yolo' | 'coco'
@@ -20,19 +21,6 @@ const FORMATS: [Format, string, string][] = [
   ['yolo', 'YOLO', 'images/, labels/ (txt ternormalisasi), data.yaml, siap untuk training YOLO'],
   ['coco', 'COCO JSON', 'images/ + annotations/instances_{split}.json (bbox pixel)'],
 ]
-
-async function downloadExport(projectId: number, body: object) {
-  const res = await fetch(`/api/projects/${projectId}/export`, { ...json('POST', body), headers: { 'Content-Type': 'application/json' } })
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null)
-    throw new ApiError(res.status, detail?.detail ?? res.statusText)
-  }
-  const name = /filename="?([^"]+)"?/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'dataset.zip'
-  const url = URL.createObjectURL(await res.blob())
-  const a = Object.assign(document.createElement('a'), { href: url, download: name })
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 export function ExportTab() {
   const id = useProjectId()
@@ -68,7 +56,7 @@ export function ExportTab() {
           setBusy(true)
           setError(null)
           try {
-            await downloadExport(id, body)
+            await downloadPost(`/projects/${id}/export`, body)
           } catch (err) {
             setError(err)
           } finally {

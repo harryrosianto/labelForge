@@ -13,6 +13,7 @@ import { GalleryTab } from './pages/project/GalleryTab'
 import { OverviewTab } from './pages/project/OverviewTab'
 import { ProjectLayout } from './pages/project/ProjectLayout'
 import { UploadTab } from './pages/project/UploadTab'
+import { VersionsTab } from './pages/project/VersionsTab'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: 'upload', element: <UploadTab /> },
       { path: 'gallery', element: <GalleryTab /> },
       { path: 'autolabel', element: <AutolabelTab /> },
+      { path: 'versions', element: <VersionsTab /> },
       { path: 'export', element: <ExportTab /> },
     ],
   },

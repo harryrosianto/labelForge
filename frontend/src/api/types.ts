@@ -205,3 +205,52 @@ export interface DatasetImport {
   job_id: number | null
   created_at: string
 }
+
+export interface Preprocessing {
+  resize: 'none' | 'stretch' | 'fit'
+  width?: number | null
+  height?: number | null
+}
+
+export interface VersionSettings {
+  reviewed_only: boolean
+  split: { train: number; val: number; test: number }
+  seed: number
+  preprocessing: Preprocessing
+}
+
+export interface VersionSummary {
+  images: number
+  source_images: number
+  augmented: number
+  annotations: number
+  splits: { train: number; val: number; test: number }
+  per_class: { name: string; boxes: number; images: number }[]
+  empty_images: number
+}
+
+export interface DatasetVersion {
+  id: number
+  project_id: number
+  name: string
+  notes: string | null
+  status: 'building' | 'ready' | 'failed'
+  config: VersionSettings & { classes: { name: string; color: string }[] }
+  summary: VersionSummary | null
+  image_count: number
+  job_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VersionCompare {
+  a: { id: number; name: string; summary: VersionSummary }
+  b: { id: number; name: string; summary: VersionSummary }
+  images_only_in_a: number
+  images_only_in_b: number
+  images_in_both: number
+  labels_changed: number
+  split_changed: number
+  per_class: { name: string; a: number; b: number }[]
+  settings_changed: Record<string, { a: unknown; b: unknown }>
+}

@@ -44,6 +44,9 @@ class ExportDataset:
     class_names: list[str]
     splits: dict[str, list[ExportImage]]
     options: ExportOptions
+    # Diisi untuk export dari versi: waktu tetap (ZIP identik setiap unduhan) + info versi.
+    exported_at: datetime | None = None
+    extra_info: dict | None = None
 
     @property
     def num_images(self) -> int:
@@ -64,7 +67,7 @@ class ExportDataset:
         }
 
 
-def _safe_stem(name: str) -> str:
+def safe_stem(name: str) -> str:
     stem = re.sub(r"[^A-Za-z0-9._-]+", "_", PurePosixPath(name).stem).strip("._")
     return stem[:80] or "image"
 
@@ -102,7 +105,7 @@ def collect_dataset(db: Session, project_id: int, options: ExportOptions) -> Exp
         ]
         by_id[img.id] = ExportImage(
             id=img.id,
-            file_name=f"{img.id:06d}_{_safe_stem(img.original_filename)}{ext}",
+            file_name=f"{img.id:06d}_{safe_stem(img.original_filename)}{ext}",
             storage_key=img.storage_key,
             width=img.width,
             height=img.height,
@@ -121,16 +124,25 @@ def collect_dataset(db: Session, project_id: int, options: ExportOptions) -> Exp
 def export_info(dataset: ExportDataset) -> dict:
     return {
         "project": dataset.project.name,
-        "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "exported_at": (dataset.exported_at or datetime.now(timezone.utc)).isoformat(timespec="seconds"),
         "format": dataset.options.format,
         "reviewed_only": dataset.options.reviewed_only,
         "split_ratio": dataset.options.split,
         "seed": dataset.options.seed,
         "classes": dataset.class_names,
         **dataset.summary(),
+        **(dataset.extra_info or {}),
     }
 
 
+# Tanggal tetap untuk semua entri ZIP agar isi export yang sama menghasilkan file identik.
+ZIP_DATE = (2020, 1, 1, 0, 0, 0)
+
+
 def write_text(zf: zipfile.ZipFile, path: str, text: str) -> None:
-    zf.writestr(zipfile.ZipInfo(path, date_time=(2020, 1, 1, 0, 0, 0)), text,
-                compress_type=zipfile.ZIP_DEFLATED)  # fmt: skip
+    zf.writestr(zipfile.ZipInfo(path, date_time=ZIP_DATE), text, compress_type=zipfile.ZIP_DEFLATED)
+
+
+def write_bytes(zf: zipfile.ZipFile, path: str, data: bytes) -> None:
+    """Gambar sudah terkompresi (JPEG/PNG), jadi disimpan tanpa kompresi ulang."""
+    zf.writestr(zipfile.ZipInfo(path, date_time=ZIP_DATE), data, compress_type=zipfile.ZIP_STORED)

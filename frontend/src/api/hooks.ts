@@ -4,6 +4,10 @@ import { api, json, queryString } from './client'
 import type {
   ClassMapping,
   DatasetImport,
+  DatasetVersion,
+  VersionCompare,
+  VersionSettings,
+  VersionSummary,
   Exemplar,
   Health,
   ImageDetail,
@@ -136,7 +140,7 @@ export function useDeleteImages(projectId: number) {
   const invalidate = useInvalidateProject(projectId)
   return useMutation({
     mutationFn: (imageIds: number[]) =>
-      api<{ deleted: number }>(`/projects/${projectId}/images/bulk-delete`, json('POST', { image_ids: imageIds })),
+      api<{ deleted: number; protected: number[] }>(`/projects/${projectId}/images/bulk-delete`, json('POST', { image_ids: imageIds })),
     onSuccess: invalidate,
   })
 }
@@ -311,3 +315,55 @@ export function useDiscardImport(projectId: number) {
     onSuccess: () => qc.invalidateQueries({ queryKey: [...keys.project(projectId), 'imports'] }),
   })
 }
+
+// --- versi dataset -------------------------------------------------------------
+
+const versionsKey = (projectId: number) => [...keys.project(projectId), 'versions'] as const
+
+export const useVersions = (projectId: number) =>
+  useQuery({
+    queryKey: versionsKey(projectId),
+    queryFn: () => api<DatasetVersion[]>(`/projects/${projectId}/versions`),
+    refetchInterval: (q) => (q.state.data?.some((v) => v.status === 'building') ? 2000 : false),
+  })
+
+export const useVersionPreview = (projectId: number, settings: VersionSettings, enabled: boolean) =>
+  useQuery({
+    queryKey: [...versionsKey(projectId), 'preview', settings],
+    queryFn: () => api<VersionSummary>(`/projects/${projectId}/versions/preview`, json('POST', settings)),
+    enabled,
+    placeholderData: keepPreviousData,
+  })
+
+export function useCreateVersion(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: VersionSettings & { name: string; notes: string | null }) =>
+      api<DatasetVersion>(`/projects/${projectId}/versions`, json('POST', body)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.project(projectId) }),
+  })
+}
+
+export function useUpdateVersion(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: number; name?: string; notes?: string | null }) =>
+      api<DatasetVersion>(`/versions/${id}`, json('PATCH', body)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: versionsKey(projectId) }),
+  })
+}
+
+export function useDeleteVersion(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/versions/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: versionsKey(projectId) }),
+  })
+}
+
+export const useCompareVersions = (a: number | null, b: number | null) =>
+  useQuery({
+    queryKey: ['versions-compare', a, b],
+    queryFn: () => api<VersionCompare>(`/versions/compare${queryString({ a, b })}`),
+    enabled: a !== null && b !== null,
+  })

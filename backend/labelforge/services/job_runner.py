@@ -27,7 +27,11 @@ JOB_QUEUES: dict[str, str] = {JobType.AUTOLABEL: "inference"}
 DEFAULT_QUEUE = "io"
 
 # Modul yang mendaftarkan handler; ditambah seiring tipe job baru.
-HANDLER_MODULES: list[str] = ["labelforge.services.jobs", "labelforge.importers.job"]
+HANDLER_MODULES: list[str] = [
+    "labelforge.services.jobs",
+    "labelforge.importers.job",
+    "labelforge.versions.job",
+]
 
 
 def queue_for(job_type: str) -> str:
