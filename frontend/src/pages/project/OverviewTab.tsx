@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useJobs, useProjectStats } from '../../api/hooks'
 import type { ImageStatus } from '../../api/types'
 import { JobStatusBadge } from '../../components/StatusBadge'
-import { IMAGE_STATUS_LABELS } from '../../lib/labels'
+import { IMAGE_STATUS_LABELS, JOB_TYPE_LABELS } from '../../lib/labels'
 import { EmptyState, ErrorText, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
 
@@ -84,7 +84,8 @@ export function OverviewTab() {
               <li key={j.id} className="flex items-center gap-2">
                 <JobStatusBadge status={j.status} />
                 <span>
-                  #{j.id} {j.provider}/{j.mode}
+                  #{j.id} {JOB_TYPE_LABELS[j.job_type] ?? j.job_type}
+                  {j.provider && ` · ${j.provider}/${j.mode}`}
                 </span>
                 <span className="ml-auto tabular-nums text-slate-500">
                   {j.processed}/{j.total}

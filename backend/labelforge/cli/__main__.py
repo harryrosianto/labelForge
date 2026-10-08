@@ -195,6 +195,44 @@ def cmd_import_images(args) -> int:
     return 0
 
 
+def cmd_migrate(_args) -> int:
+    """Upgrade schema DB ke versi terbaru; DB SQLite di-backup dulu jika ada migrasi baru."""
+    import sqlite3
+    from datetime import datetime
+
+    from alembic import command
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    from labelforge.db import get_engine
+
+    backend_dir = Path(__file__).resolve().parents[2]
+    cfg = Config(str(backend_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(backend_dir / "alembic"))
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    engine = get_engine()
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    if current == head:
+        print(f"Schema DB sudah terbaru ({head}).")
+        return 0
+
+    db_path = engine.url.database if engine.url.get_backend_name() == "sqlite" else None
+    if current is not None and db_path and Path(db_path).is_file():
+        backup_dir = Path(db_path).parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        target = backup_dir / f"{Path(db_path).stem}-{current}-{datetime.now():%Y%m%d-%H%M%S}.db"
+        with sqlite3.connect(db_path) as src, sqlite3.connect(target) as dst:
+            src.backup(dst)  # aman walau DB sedang dibuka proses lain (WAL)
+        print(f"Backup DB: {target}")
+
+    print(f"Migrasi schema {current or '(kosong)'} -> {head} ...")
+    command.upgrade(cfg, "head")
+    print("Selesai.")
+    return 0
+
+
 def cmd_providers(_args) -> int:
     for p in describe_providers():
         status = "tersedia" if p["available"] else f"TIDAK tersedia: {p['unavailable_reason']}"
@@ -234,6 +272,9 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--project-id", type=int, required=True)
     i.add_argument("--input", required=True)
     i.set_defaults(func=cmd_import_images)
+
+    m = sub.add_parser("migrate", help="Upgrade schema DB (backup otomatis jika ada migrasi baru)")
+    m.set_defaults(func=cmd_migrate)
 
     p = sub.add_parser("providers", help="Daftar provider dan parameternya")
     p.set_defaults(func=cmd_providers)

@@ -1,7 +1,12 @@
 """Aplikasi Celery.
 
-Jalankan worker (satu proses, model di-load sekali & tetap di memori):
+Worker inference (satu proses, model AI di-load sekali & tetap di memori):
     celery -A labelforge.worker.celery_app worker --pool=solo --concurrency=1 -Q inference
+
+Worker io (import, versi, video, RTSP; tanpa model AI):
+    WORKER_PRELOAD= celery -A labelforge.worker.celery_app worker --pool=threads --concurrency=2 -Q io
+
+Untuk development cukup satu worker yang mendengar keduanya: `-Q inference,io`.
 
 Queue per jenis pekerjaan (mis. `inference`, `training`) supaya bisa
 dijalankan di mesin berbeda.

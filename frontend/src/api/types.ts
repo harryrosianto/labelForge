@@ -3,6 +3,7 @@
 export type ImageStatus = 'unlabeled' | 'auto_labeled' | 'reviewed'
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type JobTarget = 'all' | 'unlabeled' | 'selected'
+export type JobType = 'autolabel' | 'import' | 'version_build' | 'video_extract' | 'rtsp_capture' | 'train'
 
 export interface Project {
   id: number
@@ -112,8 +113,8 @@ export interface ProviderInfo {
 export interface Job {
   id: number
   project_id: number
-  job_type: string
-  provider: string
+  job_type: JobType
+  provider: string | null
   mode: string | null
   params: Record<string, unknown>
   target: JobTarget
@@ -123,6 +124,8 @@ export interface Job {
   processed: number
   failed_count: number
   warnings: string[]
+  payload: Record<string, unknown> | null
+  result: Record<string, unknown> | null
   error: string | null
   cancel_requested: boolean
   created_at: string
@@ -133,7 +136,8 @@ export interface Job {
 
 export interface JobItem {
   id: number
-  image_id: number
+  image_id: number | null
+  label: string | null
   status: 'pending' | 'done' | 'error'
   num_detections: number | null
   error: string | null

@@ -2,9 +2,11 @@
 
 from typing import Protocol
 
+from labelforge.services.job_runner import queue_for
+
 
 class JobQueue(Protocol):
-    def enqueue_autolabel(self, job_id: int) -> str | None: ...
+    def enqueue(self, job_type: str, job_id: int) -> str | None: ...
 
     def revoke(self, task_id: str) -> None: ...
 
@@ -12,11 +14,12 @@ class JobQueue(Protocol):
 
 
 class CeleryJobQueue:
-    def enqueue_autolabel(self, job_id: int) -> str | None:
+    def enqueue(self, job_type: str, job_id: int) -> str | None:
         from labelforge.worker.celery_app import celery_app
 
         # send_task: proses web tidak perlu meng-import modul task (dan dependency ML-nya).
-        return celery_app.send_task("labelforge.autolabel", args=[job_id]).id
+        result = celery_app.send_task("labelforge.run_job", args=[job_id], queue=queue_for(job_type))
+        return result.id
 
     def revoke(self, task_id: str) -> None:
         from labelforge.worker.celery_app import celery_app

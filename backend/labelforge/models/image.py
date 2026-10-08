@@ -1,10 +1,22 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, Float, ForeignKey, Index, Integer, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from labelforge.models.base import Base, TimestampMixin
-from labelforge.models.enums import SOURCE_MANUAL, ImageStatus, ShapeType
+from labelforge.models.enums import SOURCE_MANUAL, ImageSource, ImageStatus, ShapeType
 
 if TYPE_CHECKING:
     from labelforge.models.label_class import LabelClass
@@ -29,6 +41,15 @@ class Image(TimestampMixin, Base):
     height: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32), default=ImageStatus.UNLABELED)
+    # Asal gambar: upload langsung, import dataset, frame video, atau capture kamera RTSP.
+    source_type: Mapped[str] = mapped_column(
+        String(16), default=ImageSource.UPLOAD, server_default=ImageSource.UPLOAD, index=True
+    )
+    source_id: Mapped[int | None] = mapped_column(Integer)  # id video / kamera / import
+    source_label: Mapped[str | None] = mapped_column(String(200))
+    frame_time_s: Mapped[float | None] = mapped_column(Float)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dhash: Mapped[str | None] = mapped_column(String(16))  # hash perseptual 64-bit (hex)
 
     project: Mapped["Project"] = relationship(back_populates="images")
     annotations: Mapped[list["Annotation"]] = relationship(

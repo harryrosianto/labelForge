@@ -160,7 +160,7 @@ def test_cancel_queued_job(client, setup, queue):
 
     # worker yang terlambat mengambil task tidak memproses apa pun
     queue.run = True
-    queue.enqueue_autolabel(job["id"])
+    queue.enqueue("autolabel", job["id"])
     assert FakeProvider.calls == 0
 
 

@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Token yang diwajibkan oleh inference server ini sendiri (kosong = tanpa auth)
     inference_server_token: str | None = None
 
+    # Kunci enkripsi kredensial kamera RTSP (Fernet). Buat dengan:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    secret_key: str | None = None
+
     # Upload
     thumbnail_size: int = 320
     max_upload_mb: int = 2048

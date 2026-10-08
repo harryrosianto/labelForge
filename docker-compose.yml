@@ -56,6 +56,28 @@ services:
       # Cache model HuggingFace agar tidak di-download ulang. Default: named volume.
       # Untuk memakai cache yang sudah ada di host: HF_CACHE_DIR=/path/ke/.cache/huggingface
       - ${HF_CACHE_DIR:-hf_cache}:/hf_cache
+    command: ["celery", "-A", "labelforge.worker.celery_app", "worker", "--pool=solo",
+              "--concurrency=1", "-Q", "inference", "--loglevel=INFO", "-n", "inference@%h"]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Job non-AI (import, versi, video, RTSP): image web (tanpa torch), boleh paralel.
+  worker-io:
+    build:
+      context: ./backend
+      target: web
+    command: ["celery", "-A", "labelforge.worker.celery_app", "worker", "--pool=threads",
+              "--concurrency=2", "-Q", "io", "--loglevel=INFO", "-n", "io@%h"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *backend-env
+      WORKER_PRELOAD: ""
+    volumes:
+      - data:/data
     depends_on:
       web:
         condition: service_healthy

@@ -21,7 +21,7 @@ class JobOut(BaseModel):
     id: int
     project_id: int
     job_type: str
-    provider: str
+    provider: str | None
     mode: str | None
     params: dict[str, Any]
     target: str
@@ -31,6 +31,8 @@ class JobOut(BaseModel):
     processed: int
     failed_count: int
     warnings: list[str]
+    payload: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
     error: str | None
     cancel_requested: bool
     created_at: datetime
@@ -48,7 +50,8 @@ class JobItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    image_id: int
+    image_id: int | None
+    label: str | None = None
     status: str
     num_detections: int | None
     error: str | None
