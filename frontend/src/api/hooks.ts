@@ -3,6 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { api, json, queryString } from './client'
 import type {
   ClassMapping,
+  DatasetStatsData,
   DatasetImport,
   DatasetVersion,
   VersionCompare,
@@ -366,4 +367,21 @@ export const useCompareVersions = (a: number | null, b: number | null) =>
     queryKey: ['versions-compare', a, b],
     queryFn: () => api<VersionCompare>(`/versions/compare${queryString({ a, b })}`),
     enabled: a !== null && b !== null,
+  })
+
+// --- statistik dataset ---------------------------------------------------------
+
+export const useDatasetStats = (projectId: number, filters: ImageFilters) =>
+  useQuery({
+    queryKey: [...keys.stats(projectId), 'dataset', filters],
+    queryFn: () => api<DatasetStatsData>(`/projects/${projectId}/stats/dataset${queryString(filters)}`),
+    placeholderData: keepPreviousData,
+  })
+
+export const useVersionStats = (versionId: number, enabled: boolean) =>
+  useQuery({
+    queryKey: ['version-stats', versionId],
+    queryFn: () => api<DatasetStatsData>(`/versions/${versionId}/stats`),
+    enabled,
+    staleTime: Infinity, // isi versi tidak pernah berubah
   })

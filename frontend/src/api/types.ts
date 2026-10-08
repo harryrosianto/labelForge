@@ -254,3 +254,21 @@ export interface VersionCompare {
   per_class: { name: string; a: number; b: number }[]
   settings_changed: Record<string, { a: unknown; b: unknown }>
 }
+
+export interface DatasetStatsData {
+  images: number
+  boxes: number
+  empty_images: number
+  classes: { name: string; boxes: number; images: number; small: number; medium: number; large: number }[]
+  box_size: {
+    small: number
+    medium: number
+    large: number
+    relative_side_hist: { from: number; to: number; count: number }[]
+  }
+  boxes_per_image: { label: string; count: number }[]
+  aspect_ratio: { label: string; count: number }[]
+  heatmap: { grid: number; counts: number[][] }
+  image_sizes: { width: number; height: number; count: number }[]
+  warnings: { kind: string; classes: string[]; message: string }[]
+}

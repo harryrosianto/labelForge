@@ -14,6 +14,7 @@ from labelforge.api.routers import (
     imports,
     jobs,
     projects,
+    stats,
     versions,
 )
 from labelforge.config import get_settings
@@ -30,7 +31,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (projects, classes, images, annotations, jobs, export, imports, versions):
+    for module in (projects, classes, images, annotations, jobs, export, imports, versions, stats):
         app.include_router(module.router, prefix="/api")
 
     @app.get("/api/health", tags=["health"])

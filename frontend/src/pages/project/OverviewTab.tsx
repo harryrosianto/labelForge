@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useJobs, useProjectStats } from '../../api/hooks'
+import { useClasses, useDatasetStats, useJobs, useProjectStats } from '../../api/hooks'
 import type { ImageStatus } from '../../api/types'
+import { DatasetStats } from '../../components/DatasetStats'
 import { JobStatusBadge } from '../../components/StatusBadge'
 import { IMAGE_STATUS_LABELS, JOB_TYPE_LABELS } from '../../lib/labels'
-import { EmptyState, ErrorText, Spinner } from '../../components/ui'
+import { EmptyState, ErrorText, inputClass, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
 
 function Stat({ label, value, to }: { label: string; value: number; to?: string }) {
@@ -95,6 +97,29 @@ export function OverviewTab() {
           </ul>
         </section>
       </div>
+
+      <DatasetStatsSection projectId={id} />
     </div>
+  )
+}
+
+function DatasetStatsSection({ projectId }: { projectId: number }) {
+  const [status, setStatus] = useState<ImageStatus | ''>('')
+  const { data, isFetching, error } = useDatasetStats(projectId, status ? { status } : {})
+  const { data: classes } = useClasses(projectId)
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-semibold">Statistik dataset</h2>
+        <select className={`${inputClass} w-auto`} value={status} onChange={(e) => setStatus(e.target.value as ImageStatus | '')}>
+          <option value="">Semua gambar</option>
+          <option value="reviewed">Hanya reviewed</option>
+          <option value="auto_labeled">Hanya auto-label</option>
+        </select>
+        {isFetching && <Spinner className="text-slate-400" />}
+      </div>
+      <ErrorText error={error} />
+      {data && <DatasetStats stats={data} classes={classes} />}
+    </section>
   )
 }

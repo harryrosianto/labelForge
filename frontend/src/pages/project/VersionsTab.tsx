@@ -8,8 +8,10 @@ import {
   useUpdateVersion,
   useVersionPreview,
   useVersions,
+  useVersionStats,
 } from '../../api/hooks'
 import type { DatasetVersion, Preprocessing, VersionSettings, VersionSummary } from '../../api/types'
+import { DatasetStats } from '../../components/DatasetStats'
 import { Button, EmptyState, ErrorText, Field, inputClass, Spinner } from '../../components/ui'
 import { downloadPost } from '../../lib/download'
 import { useProjectId } from '../../lib/route'
@@ -294,6 +296,8 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
         <dd>{cfg.classes.map((c) => c.name).join(', ')}</dd>
       </dl>
 
+      {version.status === 'ready' && <VersionStatsPanel versionId={version.id} />}
+
       <ErrorText error={error ?? update.error ?? remove.error} />
       <div className="flex gap-2 border-t border-slate-100 pt-3">
         {(['yolo', 'coco'] as const).map((f) => (
@@ -303,6 +307,21 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
         ))}
       </div>
     </div>
+  )
+}
+
+function VersionStatsPanel({ versionId }: { versionId: number }) {
+  const [open, setOpen] = useState(false)
+  const { data, isLoading, error } = useVersionStats(versionId, open)
+  return (
+    <details className="rounded-md ring-1 ring-slate-200" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Statistik versi</summary>
+      <div className="border-t border-slate-100 bg-slate-50 p-3">
+        {isLoading && <Spinner />}
+        <ErrorText error={error} />
+        {data && <DatasetStats stats={data} />}
+      </div>
+    </details>
   )
 }
 
