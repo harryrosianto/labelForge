@@ -14,7 +14,8 @@ import type { LabelClass } from '../../api/types'
 import { Button, ErrorText, inputClass, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
 
-const PROMPT_HINT = 'Deskripsi untuk model; pisahkan sinonim dengan koma, mis. "wooden pallet, plastic pallet"'
+const PROMPT_HINT =
+  'Frasa benda singkat dalam bahasa Inggris (maks. ~8 kata), bukan kalimat penjelasan. Pisahkan sinonim dengan koma, mis. "wooden pallet, plastic pallet" atau "cardboard box, carton".'
 
 function ExemplarStrip({ cls }: { cls: LabelClass }) {
   const { data: exemplars, isLoading } = useExemplars(cls.id)

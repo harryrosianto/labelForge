@@ -15,6 +15,8 @@ from labelforge.providers.registry import register_provider
 
 TEXT = "text"
 IMAGE_GUIDED = "image_guided"
+# "a photo of a " + frasa harus muat 16 token; ~8 kata adalah batas aman.
+MAX_QUERY_WORDS = 8
 
 
 @register_provider
@@ -49,7 +51,14 @@ class Owlv2Provider(LabelingProvider):
     @classmethod
     def class_warnings(cls, mode: str, classes: list[ClassDef]) -> list[str]:
         if mode != IMAGE_GUIDED:
-            return []
+            # Query teks OWLv2 dibatasi 16 token; kalimat panjang dipotong dan akurasinya buruk.
+            return [
+                f"Prompt class '{c.name}' terlalu panjang dan akan dipotong: \"{p}\". "
+                "OWLv2 paling akurat dengan frasa benda singkat, mis. \"cardboard box\"."
+                for c in classes
+                for p in c.prompts
+                if len(p.split()) > MAX_QUERY_WORDS
+            ]
         return [
             f"Class '{c.name}' tidak punya contoh visual, dilewati pada mode image-guided"
             for c in classes
@@ -90,19 +99,24 @@ class Owlv2Provider(LabelingProvider):
             return self._detect_image_guided(image, classes, params)
         return self._detect_text(image, classes, params)
 
-    def _detect_text(
-        self, image: Image.Image, classes: list[ClassDef], params: dict[str, Any]
-    ) -> list[Detection]:
-        torch = self._torch
-        # Satu query per frasa sinonim; query_class memetakan indeks query → class_id.
+    def _text_inputs(self, image: Image.Image, classes: list[ClassDef]) -> tuple[dict, list[int]]:
+        """Input model untuk mode teks. Satu query per frasa sinonim; list kedua memetakan
+        indeks query → class_id."""
         queries, query_class = [], []
         for c in classes:
             for phrase in c.prompts:
                 queries.append(f"a photo of a {phrase.lower()}")
                 query_class.append(c.id)
-        inputs = self._to_device(
-            self.processor(text=[queries], images=image, return_tensors="pt")
-        )
+        # padding + truncation: tiap query panjangnya beda dan dibatasi 16 token oleh model.
+        inputs = self.processor(text=[queries], images=image, return_tensors="pt",
+                                padding="max_length", truncation=True)  # fmt: skip
+        return self._to_device(inputs), query_class
+
+    def _detect_text(
+        self, image: Image.Image, classes: list[ClassDef], params: dict[str, Any]
+    ) -> list[Detection]:
+        torch = self._torch
+        inputs, query_class = self._text_inputs(image, classes)
         with torch.inference_mode():
             outputs = self.model(**inputs)
         result = self.processor.post_process_grounded_object_detection(
