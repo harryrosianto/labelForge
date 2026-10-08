@@ -18,7 +18,15 @@ from labelforge.models import DatasetVersion
 from labelforge.models.enums import JobStatus, JobType, VersionStatus
 from labelforge.services.job_runner import create_job
 from labelforge.storage import project_prefix
-from labelforge.versions.builder import VersionCreate, VersionSettings, create_version, plan_items, summarize
+from labelforge.versions.builder import (
+    VersionCreate,
+    VersionSettings,
+    create_version,
+    plan_items,
+    planned_augmented,
+    summarize,
+)
+from labelforge.versions.preview import AugmentPreviewRequest, preview_augmentation
 from labelforge.versions.export import compare_versions, version_dataset
 
 router = APIRouter(tags=["versions"])
@@ -71,7 +79,16 @@ def preview_version(project_id: int, body: VersionSettings, db: DbSession):
     """Ringkasan isi versi dengan pengaturan ini, tanpa membuat apa pun."""
     get_project_or_404(db, project_id)
     classes, items = plan_items(db, project_id, body)
-    return summarize([c.name for c in classes], items)
+    summary = summarize([c.name for c in classes], items)
+    summary["augmented"] = planned_augmented(body, summary)
+    return summary
+
+
+@router.post("/projects/{project_id}/versions/preview-augmentation")
+def preview_augmentation_endpoint(project_id: int, body: AugmentPreviewRequest, db: DbSession, storage: Storage):
+    """Contoh hasil augmentasi (gambar JPEG kecil + box) dari beberapa gambar project."""
+    get_project_or_404(db, project_id)
+    return preview_augmentation(db, storage, project_id, body)
 
 
 @router.post(

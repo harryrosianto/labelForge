@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import {
+  useAugmentPreview,
+  useClasses,
   useCompareVersions,
   useCreateVersion,
   useDeleteVersion,
@@ -10,7 +12,9 @@ import {
   useVersions,
   useVersionStats,
 } from '../../api/hooks'
-import type { DatasetVersion, Preprocessing, VersionSettings, VersionSummary } from '../../api/types'
+import type { AugmentationConfig, DatasetVersion, Preprocessing, VersionSettings, VersionSummary } from '../../api/types'
+import { AugmentationSettings } from '../../components/AugmentationSettings'
+import { DEFAULT_AUGMENTATION, describeAugmentation } from '../../lib/augmentation'
 import { DatasetStats } from '../../components/DatasetStats'
 import { Button, EmptyState, ErrorText, Field, inputClass, Spinner } from '../../components/ui'
 import { downloadPost } from '../../lib/download'
@@ -84,6 +88,9 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
   const [split, setSplit] = useState({ train: 80, val: 20, test: 0 })
   const [seed, setSeed] = useState(42)
   const [prep, setPrep] = useState<Preprocessing>({ resize: 'none', width: 640, height: 640 })
+  const [aug, setAug] = useState<AugmentationConfig>(DEFAULT_AUGMENTATION)
+  const augPreview = useAugmentPreview(projectId)
+  const { data: classes = [] } = useClasses(projectId)
 
   const validSplit = split.train > 0
   const settings: VersionSettings = {
@@ -91,6 +98,7 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
     split: { train: split.train / 100, val: split.val / 100, test: split.test / 100 },
     seed,
     preprocessing: prep.resize === 'none' ? { resize: 'none' } : prep,
+    augmentation: aug,
   }
   const preview = useVersionPreview(projectId, settings, validSplit)
 
@@ -175,6 +183,16 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
         )}
       </fieldset>
 
+      <AugmentationSettings
+        value={aug}
+        onChange={setAug}
+        classes={classes}
+        preview={augPreview.data}
+        previewing={augPreview.isPending}
+        previewError={augPreview.error}
+        onPreview={() => augPreview.mutate({ ...settings, count: 6 })}
+      />
+
       <section className="space-y-3 rounded-md bg-slate-50 p-3 ring-1 ring-slate-200">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           Pratinjau isi versi {preview.isFetching && <Spinner className="text-slate-400" />}
@@ -188,6 +206,7 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
             <p className="text-sm text-slate-600">
               {preview.data.images} gambar · {preview.data.annotations} box
               {preview.data.empty_images > 0 && ` · ${preview.data.empty_images} tanpa objek`}
+              {preview.data.augmented > 0 && ` · +${preview.data.augmented} gambar augmentasi di train`}
             </p>
             <ClassTable summary={preview.data} />
           </>
@@ -292,6 +311,8 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
         </dd>
         <dt className="text-slate-500">Preprocessing</dt>
         <dd>{describePreprocessing(cfg.preprocessing)}</dd>
+        <dt className="text-slate-500">Augmentasi</dt>
+        <dd>{describeAugmentation(cfg.augmentation)}</dd>
         <dt className="text-slate-500">Class</dt>
         <dd>{cfg.classes.map((c) => c.name).join(', ')}</dd>
       </dl>
@@ -449,6 +470,7 @@ export function VersionsTab() {
                   </span>
                   <span className="block text-xs text-slate-500">
                     {v.image_count} gambar · {describePreprocessing(v.config.preprocessing)}
+                    {v.config.augmentation?.enabled && ` · augmentasi ${v.config.augmentation.multiplier}×`}
                   </span>
                 </button>
               </div>

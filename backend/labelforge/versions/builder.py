@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from labelforge.augment.pipeline import AugmentationConfig
 from labelforge.exporters.split import SPLITS, split_ids
 from labelforge.models import DatasetVersion, DatasetVersionItem, Image, LabelClass
 from labelforge.models.enums import ImageStatus, VersionStatus
@@ -37,6 +38,7 @@ class VersionSettings(BaseModel):
     split: SplitRatio = SplitRatio()
     seed: int = 42
     preprocessing: Preprocessing = Preprocessing()
+    augmentation: AugmentationConfig = AugmentationConfig()
 
 
 class VersionCreate(VersionSettings):
@@ -128,7 +130,10 @@ def create_version(db: Session, project_id: int, body: VersionCreate) -> tuple[D
             else "Belum ada gambar berlabel untuk dibuat versi"
         )
     class_names = [c.name for c in classes]
-    needs_files = body.preprocessing.active
+    # File gambar asli perlu dibuat ulang hanya bila ada preprocessing; augmentasi selalu
+    # menghasilkan file baru (dibuat job, item augmentasi ditambahkan oleh job).
+    resize = body.preprocessing.active
+    needs_files = resize or body.augmentation.enabled
     version = DatasetVersion(
         project_id=project_id,
         name=body.name,
@@ -144,7 +149,7 @@ def create_version(db: Session, project_id: int, body: VersionCreate) -> tuple[D
     db.add(version)
     db.flush()
     for it in items:
-        key = item_key(project_id, version.id, it["split"], it["image_id"], it["variant"]) if needs_files else None
+        key = item_key(project_id, version.id, it["split"], it["image_id"], it["variant"]) if resize else None
         db.add(DatasetVersionItem(version_id=version.id, storage_key=key, **it))
     db.flush()
     return version, needs_files
@@ -160,3 +165,9 @@ def version_items(db: Session, version_id: int) -> list[DatasetVersionItem]:
 
 def file_extension(storage_key: str) -> str:
     return PurePosixPath(storage_key).suffix.lower() or ".jpg"
+
+
+def planned_augmented(settings: VersionSettings, summary: dict) -> int:
+    """Jumlah salinan augmentasi yang akan dibuat (hanya split train)."""
+    aug = settings.augmentation
+    return summary["splits"]["train"] * aug.multiplier if aug.enabled else 0

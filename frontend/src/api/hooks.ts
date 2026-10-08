@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { api, json, queryString } from './client'
 import type {
+  AugmentPreview,
   ClassMapping,
   DatasetStatsData,
   DatasetImport,
@@ -385,3 +386,10 @@ export const useVersionStats = (versionId: number, enabled: boolean) =>
     enabled,
     staleTime: Infinity, // isi versi tidak pernah berubah
   })
+
+export function useAugmentPreview(projectId: number) {
+  return useMutation({
+    mutationFn: (body: VersionSettings & { count: number }) =>
+      api<AugmentPreview>(`/projects/${projectId}/versions/preview-augmentation`, json('POST', body)),
+  })
+}

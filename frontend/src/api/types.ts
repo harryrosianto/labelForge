@@ -212,11 +212,37 @@ export interface Preprocessing {
   height?: number | null
 }
 
+export interface AugmentationConfig {
+  enabled: boolean
+  multiplier: number
+  hflip: number
+  rotate_deg: number
+  scale_min: number
+  scale_max: number
+  translate: number
+  mosaic: number
+  brightness: number
+  contrast: number
+  hue_deg: number
+  saturation: number
+  blur: number
+  blur_max_kernel: number
+  noise: number
+  noise_std: number
+  min_visibility: number
+}
+
 export interface VersionSettings {
   reviewed_only: boolean
   split: { train: number; val: number; test: number }
   seed: number
   preprocessing: Preprocessing
+  augmentation?: AugmentationConfig
+}
+
+export interface AugmentPreview {
+  classes: string[]
+  samples: { image_id: number; width: number; height: number; data_url: string; boxes: number[][] }[]
 }
 
 export interface VersionSummary {

@@ -2,6 +2,8 @@ import io
 import json
 import zipfile
 
+import pytest
+
 from PIL import Image as PILImage
 
 from labelforge.models import Annotation, Image
@@ -157,3 +159,64 @@ def test_list_versions(client, ds):  # noqa: F811
     names = [v["name"] for v in client.get(f"/api/projects/{ds['pid']}/versions").json()]
     assert names == ["dua", "satu"]
 
+
+
+AUG = {"enabled": True, "multiplier": 2, "hflip": 1.0, "brightness": 0, "contrast": 0}
+
+
+def _zip_payload(content: bytes) -> dict[str, bytes]:
+    """Isi ZIP tanpa export_info (yang memuat nama/tanggal versi)."""
+    zf = zipfile.ZipFile(io.BytesIO(content))
+    return {n: zf.read(n) for n in zf.namelist() if n != "export_info.json"}
+
+
+def test_augmented_version(client, ds, queue):  # noqa: F811
+    pid = ds["pid"]
+    p = client.post(f"/api/projects/{pid}/versions/preview",
+                    json={"split": ALL_TRAIN, "augmentation": AUG}).json()  # fmt: skip
+    assert p["augmented"] == 4  # 2 gambar train x 2 salinan
+
+    v = create(client, pid, name="aug", augmentation=AUG).json()
+    assert v["status"] == "ready"
+    assert v["image_count"] == 6 and v["summary"]["augmented"] == 4
+    job = client.get(f"/api/jobs/{v['job_id']}").json()
+    assert job["result"]["augmented"] == 4 and job["failed_count"] == 0
+
+    zf = zipfile.ZipFile(io.BytesIO(export(client, v["id"])))
+    r1 = ds["ids"][0]
+    orig = zf.read(next(n for n in zf.namelist() if n.startswith(f"labels/train/{r1:06d}_"))).decode()
+    flipped = zf.read(next(n for n in zf.namelist() if n.startswith(f"labels/train/{r1:06d}_aug1_"))).decode()
+    # hflip pasti (p=1): cx menjadi 1 - cx, sisanya sama
+    for a, b in zip(sorted(orig.splitlines()), sorted(flipped.splitlines(), key=lambda l: l.split()[0])):
+        ca, xa, ya, wa, ha = a.split()
+        cb, xb, yb, wb, hb = b.split()
+        assert ca == cb and float(xb) == pytest.approx(1 - float(xa), abs=2e-6)
+        assert (ya, wa, ha) == (yb, wb, hb)
+    img = PILImage.open(io.BytesIO(zf.read(next(n for n in zf.namelist()
+                                              if n.startswith(f"images/train/{r1:06d}_aug2_")))))  # fmt: skip
+    assert img.size == (400, 200)
+
+
+def test_augmentation_reproducible_across_versions(client, ds):  # noqa: F811
+    cfg = {"enabled": True, "multiplier": 2, "rotate_deg": 10, "scale_min": 0.8, "scale_max": 1.2,
+           "translate": 0.1, "hue_deg": 5, "noise": 0.5}  # fmt: skip
+    a = create(client, ds["pid"], name="a", augmentation=cfg).json()["id"]
+    b = create(client, ds["pid"], name="b", augmentation=cfg).json()["id"]
+    c = create(client, ds["pid"], name="c", augmentation=cfg, seed=99).json()["id"]
+    assert _zip_payload(export(client, a)) == _zip_payload(export(client, b))
+    assert _zip_payload(export(client, a)) != _zip_payload(export(client, c))
+
+
+def test_preview_augmentation(client, ds):  # noqa: F811
+    r = client.post(f"/api/projects/{ds['pid']}/versions/preview-augmentation",
+                    json={"count": 3, "augmentation": {"hflip": 1.0},
+                          "preprocessing": {"resize": "fit", "width": 256, "height": 256}})  # fmt: skip
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["classes"] == ["pallet", "person"] and len(data["samples"]) == 2  # hanya 2 gambar reviewed
+    s = data["samples"][0]
+    assert s["data_url"].startswith("data:image/jpeg;base64,") and (s["width"], s["height"]) == (256, 256)
+    assert all(len(b) == 5 for b in s["boxes"])
+    bad = client.post(f"/api/projects/{ds['pid']}/versions/preview-augmentation",
+                      json={"augmentation": {"scale_min": 0.9, "scale_max": 0.8}})  # fmt: skip
+    assert bad.status_code == 422
