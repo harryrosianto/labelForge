@@ -6,6 +6,7 @@ import type { UploadIssue } from '../../api/types'
 import { Button, ErrorText, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
 import { ImportPanel } from './ImportPanel'
+import { VideoPanel } from './VideoPanel'
 
 const ACCEPT = '.jpg,.jpeg,.png,.bmp,.webp,.tif,.tiff,.zip'
 const BATCH_FILES = 20 // gambar dikirim per batch agar progress terlihat; ZIP dikirim sendiri-sendiri
@@ -145,11 +146,13 @@ function ImageUpload() {
 const MODES = [
   ['images', 'Gambar'],
   ['import', 'Import dataset'],
+  ['video', 'Video'],
 ] as const
 
 export function UploadTab() {
   const [params, setParams] = useSearchParams()
-  const mode = params.get('mode') === 'import' ? 'import' : 'images'
+  const raw = params.get('mode')
+  const mode = raw === 'import' || raw === 'video' ? raw : 'images'
   return (
     <div className="space-y-4">
       <div className="inline-flex rounded-md bg-slate-100 p-1">
@@ -166,7 +169,7 @@ export function UploadTab() {
           </button>
         ))}
       </div>
-      {mode === 'import' ? <ImportPanel /> : <ImageUpload />}
+      {mode === 'import' ? <ImportPanel /> : mode === 'video' ? <VideoPanel /> : <ImageUpload />}
     </div>
   )
 }

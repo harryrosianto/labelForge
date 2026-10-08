@@ -1,8 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api, json, queryString } from './client'
+import { uploadWithProgress } from './upload'
 import type {
   AugmentPreview,
+  Camera,
+  CaptureOptions,
+  ExtractOptions,
+  Job,
+  Video,
   ClassMapping,
   DatasetStatsData,
   DatasetImport,
@@ -16,14 +22,12 @@ import type {
   ImageItem,
   ImagePage,
   ImageFilters,
-  Job,
   JobItem,
   LabelClass,
   Project,
   ProjectStats,
   ProviderInfo,
-  UploadResult,
-} from './types'
+  UploadResult,} from './types'
 
 export const keys = {
   projects: ['projects'] as const,
@@ -277,29 +281,8 @@ export const useImports = (projectId: number) =>
     refetchInterval: (q) => (q.state.data?.some((i) => i.status === 'importing') ? 2000 : false),
   })
 
-/** Upload ZIP dengan progress (fetch belum mendukung progress upload). */
-export function uploadImportZip(projectId: number, file: File, onProgress: (fraction: number) => void) {
-  return new Promise<DatasetImport>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', `/api/projects/${projectId}/imports`)
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total)
-    xhr.onload = () => {
-      const body = (() => {
-        try {
-          return JSON.parse(xhr.responseText)
-        } catch {
-          return null
-        }
-      })()
-      if (xhr.status >= 200 && xhr.status < 300) resolve(body)
-      else reject(new Error(typeof body?.detail === 'string' ? body.detail : `${xhr.status} ${xhr.statusText}`))
-    }
-    xhr.onerror = () => reject(new Error('Upload gagal (koneksi terputus)'))
-    const form = new FormData()
-    form.append('file', file, file.name)
-    xhr.send(form)
-  })
-}
+export const uploadImportZip = (projectId: number, file: File, onProgress: (fraction: number) => void) =>
+  uploadWithProgress<DatasetImport>(`/projects/${projectId}/imports`, file, onProgress)
 
 export function useStartImport(projectId: number) {
   const qc = useQueryClient()
@@ -391,5 +374,72 @@ export function useAugmentPreview(projectId: number) {
   return useMutation({
     mutationFn: (body: VersionSettings & { count: number }) =>
       api<AugmentPreview>(`/projects/${projectId}/versions/preview-augmentation`, json('POST', body)),
+  })
+}
+
+// --- video & kamera -------------------------------------------------------------
+
+export const uploadVideo = (projectId: number, file: File, onProgress: (fraction: number) => void) =>
+  uploadWithProgress<Video>(`/projects/${projectId}/videos`, file, onProgress)
+
+export const useVideos = (projectId: number) =>
+  useQuery({ queryKey: [...keys.project(projectId), 'videos'], queryFn: () => api<Video[]>(`/projects/${projectId}/videos`) })
+
+export function useDeleteVideo(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/videos/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...keys.project(projectId), 'videos'] }),
+  })
+}
+
+export const useExtractPreview = (videoId: number, options: ExtractOptions, enabled: boolean) =>
+  useQuery({
+    queryKey: ['video-extract-preview', videoId, options],
+    queryFn: () => api<{ frames: number }>(`/videos/${videoId}/extract/preview`, json('POST', options)),
+    enabled,
+    placeholderData: keepPreviousData,
+  })
+
+export function useStartExtract(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ videoId, options }: { videoId: number; options: ExtractOptions }) =>
+      api<Job>(`/videos/${videoId}/extract`, json('POST', options)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.jobs(projectId) }),
+  })
+}
+
+export const useCameras = (projectId: number) =>
+  useQuery({ queryKey: [...keys.project(projectId), 'cameras'], queryFn: () => api<Camera[]>(`/projects/${projectId}/cameras`) })
+
+export function useAddCamera(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; url: string }) => api<Camera>(`/projects/${projectId}/cameras`, json('POST', body)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...keys.project(projectId), 'cameras'] }),
+  })
+}
+
+export function useDeleteCamera(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/cameras/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...keys.project(projectId), 'cameras'] }),
+  })
+}
+
+export const useTestCamera = () =>
+  useMutation({
+    mutationFn: (id: number) =>
+      api<{ ok: boolean; error?: string; width?: number; height?: number; preview?: string }>(`/cameras/${id}/test`, { method: 'POST' }),
+  })
+
+export function useStartCapture(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ cameraId, options }: { cameraId: number; options: CaptureOptions }) =>
+      api<Job>(`/cameras/${cameraId}/capture`, json('POST', options)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.jobs(projectId) }),
   })
 }

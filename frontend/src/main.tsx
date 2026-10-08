@@ -7,6 +7,7 @@ import './index.css'
 import { EditorPage } from './pages/EditorPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { AutolabelTab } from './pages/project/AutolabelTab'
+import { CamerasTab } from './pages/project/CamerasTab'
 import { ClassesTab } from './pages/project/ClassesTab'
 import { ExportTab } from './pages/project/ExportTab'
 import { GalleryTab } from './pages/project/GalleryTab'
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { index: true, element: <OverviewTab /> },
       { path: 'classes', element: <ClassesTab /> },
       { path: 'upload', element: <UploadTab /> },
+      { path: 'cameras', element: <CamerasTab /> },
       { path: 'gallery', element: <GalleryTab /> },
       { path: 'autolabel', element: <AutolabelTab /> },
       { path: 'versions', element: <VersionsTab /> },

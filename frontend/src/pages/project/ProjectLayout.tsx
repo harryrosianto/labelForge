@@ -9,6 +9,7 @@ const tabs = [
   ['', 'Overview'],
   ['classes', 'Classes'],
   ['upload', 'Upload'],
+  ['cameras', 'Kamera'],
   ['gallery', 'Galeri'],
   ['autolabel', 'Auto-label'],
   ['versions', 'Versi'],

@@ -42,8 +42,8 @@ class JobOut(BaseModel):
     @computed_field
     @property
     def progress(self) -> float:
-        """0..1"""
-        return round(self.processed / self.total, 4) if self.total else 0.0
+        """0..1 (dibatasi; total job capture berbasis durasi hanya perkiraan)."""
+        return min(1.0, round(self.processed / self.total, 4)) if self.total else 0.0
 
 
 class JobItemOut(BaseModel):

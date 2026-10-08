@@ -298,3 +298,40 @@ export interface DatasetStatsData {
   image_sizes: { width: number; height: number; count: number }[]
   warnings: { kind: string; classes: string[]; message: string }[]
 }
+
+export interface Video {
+  id: number
+  project_id: number
+  original_filename: string
+  duration_s: number | null
+  fps: number | null
+  frame_count: number | null
+  width: number | null
+  height: number | null
+  created_at: string
+}
+
+export interface ExtractOptions {
+  every_s?: number | null
+  fps?: number | null
+  start_s: number
+  end_s?: number | null
+  max_frames: number
+  dedup_threshold: number
+}
+
+export interface Camera {
+  id: number
+  project_id: number
+  name: string
+  url_masked: string
+  created_at: string
+}
+
+export interface CaptureOptions {
+  interval_s: number
+  duration_s?: number | null
+  max_frames?: number | null
+  dedup_threshold: number
+  reconnect_attempts?: number
+}

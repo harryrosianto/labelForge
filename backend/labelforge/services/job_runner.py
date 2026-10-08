@@ -31,6 +31,7 @@ HANDLER_MODULES: list[str] = [
     "labelforge.services.jobs",
     "labelforge.importers.job",
     "labelforge.versions.job",
+    "labelforge.media.job",
 ]
 
 

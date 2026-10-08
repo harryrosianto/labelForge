@@ -13,6 +13,7 @@ from labelforge.api.routers import (
     images,
     imports,
     jobs,
+    media,
     projects,
     stats,
     versions,
@@ -31,7 +32,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for module in (projects, classes, images, annotations, jobs, export, imports, versions, stats):
+    for module in (projects, classes, images, annotations, jobs, export, imports, versions, stats, media):
         app.include_router(module.router, prefix="/api")
 
     @app.get("/api/health", tags=["health"])
