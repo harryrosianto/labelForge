@@ -1,6 +1,7 @@
 // Tipe respons API backend (labelforge/schemas/*).
 
 export type ImageStatus = 'unlabeled' | 'auto_labeled' | 'reviewed'
+export type ImageSource = 'upload' | 'import' | 'video' | 'rtsp'
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type JobTarget = 'all' | 'unlabeled' | 'selected'
 export type JobType = 'autolabel' | 'import' | 'version_build' | 'video_extract' | 'rtsp_capture' | 'train'
@@ -56,6 +57,10 @@ export interface ImageItem {
   width: number
   height: number
   status: ImageStatus
+  source_type: ImageSource
+  source_id: number | null
+  source_label: string | null
+  frame_time_s: number | null
   created_at: string
   updated_at: string
   annotations: Annotation[]
@@ -153,6 +158,7 @@ export interface Health {
 
 export interface ImageFilters {
   status?: ImageStatus
+  source_type?: ImageSource
   class_id?: number
   source?: string
   max_conf?: number
@@ -165,5 +171,37 @@ export interface Exemplar {
   source_annotation_id: number | null
   width: number
   height: number
+  created_at: string
+}
+
+export type MappingAction = 'map' | 'create' | 'ignore'
+
+export interface ClassMapping {
+  action: MappingAction
+  class_id?: number | null
+  name?: string | null
+}
+
+export interface ImportAnalysis {
+  format: 'yolo' | 'coco'
+  images: number
+  images_with_boxes: number
+  boxes: number
+  splits: Record<string, number>
+  classes: { name: string; boxes: number; images: number }[]
+  problem_counts: Record<string, { count: number; label: string }>
+  problems: { kind: string; path: string; detail: string }[]
+  suggested_mapping: Record<string, ClassMapping>
+}
+
+export interface DatasetImport {
+  id: number
+  project_id: number
+  original_filename: string
+  format: 'yolo' | 'coco' | null
+  status: 'analyzed' | 'importing' | 'completed' | 'failed'
+  error: string | null
+  analysis: ImportAnalysis | null
+  job_id: number | null
   created_at: string
 }

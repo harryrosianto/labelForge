@@ -2,6 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { api, json, queryString } from './client'
 import type {
+  ClassMapping,
+  DatasetImport,
   Exemplar,
   Health,
   ImageDetail,
@@ -257,5 +259,55 @@ export function useDeleteExemplar(projectId: number) {
       qc.invalidateQueries({ queryKey: ['exemplars', ex.class_id] })
       qc.invalidateQueries({ queryKey: keys.classes(projectId) })
     },
+  })
+}
+
+// --- import dataset ----------------------------------------------------------
+
+export const useImports = (projectId: number) =>
+  useQuery({
+    queryKey: [...keys.project(projectId), 'imports'],
+    queryFn: () => api<DatasetImport[]>(`/projects/${projectId}/imports`),
+    refetchInterval: (q) => (q.state.data?.some((i) => i.status === 'importing') ? 2000 : false),
+  })
+
+/** Upload ZIP dengan progress (fetch belum mendukung progress upload). */
+export function uploadImportZip(projectId: number, file: File, onProgress: (fraction: number) => void) {
+  return new Promise<DatasetImport>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/api/projects/${projectId}/imports`)
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total)
+    xhr.onload = () => {
+      const body = (() => {
+        try {
+          return JSON.parse(xhr.responseText)
+        } catch {
+          return null
+        }
+      })()
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body)
+      else reject(new Error(typeof body?.detail === 'string' ? body.detail : `${xhr.status} ${xhr.statusText}`))
+    }
+    xhr.onerror = () => reject(new Error('Upload gagal (koneksi terputus)'))
+    const form = new FormData()
+    form.append('file', file, file.name)
+    xhr.send(form)
+  })
+}
+
+export function useStartImport(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, mapping, markForReview }: { id: number; mapping: Record<string, ClassMapping>; markForReview: boolean }) =>
+      api<DatasetImport>(`/imports/${id}/start`, json('POST', { mapping, mark_for_review: markForReview })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.project(projectId) }),
+  })
+}
+
+export function useDiscardImport(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/imports/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...keys.project(projectId), 'imports'] }),
   })
 }

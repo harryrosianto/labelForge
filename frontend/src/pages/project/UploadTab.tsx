@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import { useUploadImages } from '../../api/hooks'
 import type { UploadIssue } from '../../api/types'
 import { Button, ErrorText, Spinner } from '../../components/ui'
 import { useProjectId } from '../../lib/route'
+import { ImportPanel } from './ImportPanel'
 
 const ACCEPT = '.jpg,.jpeg,.png,.bmp,.webp,.tif,.tiff,.zip'
 const BATCH_FILES = 20 // gambar dikirim per batch agar progress terlihat; ZIP dikirim sendiri-sendiri
@@ -42,7 +43,7 @@ function IssueList({ title, items, className }: { title: string; items: UploadIs
   )
 }
 
-export function UploadTab() {
+function ImageUpload() {
   const id = useProjectId()
   const upload = useUploadImages(id)
   const input = useRef<HTMLInputElement>(null)
@@ -137,6 +138,35 @@ export function UploadTab() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+const MODES = [
+  ['images', 'Gambar'],
+  ['import', 'Import dataset'],
+] as const
+
+export function UploadTab() {
+  const [params, setParams] = useSearchParams()
+  const mode = params.get('mode') === 'import' ? 'import' : 'images'
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex rounded-md bg-slate-100 p-1">
+        {MODES.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setParams(value === 'images' ? {} : { mode: value })}
+            className={`rounded px-3 py-1.5 text-sm font-medium ${
+              mode === value ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === 'import' ? <ImportPanel /> : <ImageUpload />}
     </div>
   )
 }

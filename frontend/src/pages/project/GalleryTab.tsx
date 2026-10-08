@@ -3,18 +3,20 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useClasses, useDeleteImages, useImages } from '../../api/hooks'
 import { ImageThumb } from '../../components/ImageThumb'
-import { IMAGE_STATUS_LABELS } from '../../lib/labels'
+import { IMAGE_SOURCE_LABELS, IMAGE_STATUS_LABELS } from '../../lib/labels'
 import { Button, EmptyState, ErrorText, inputClass, Spinner } from '../../components/ui'
 import { filtersFromParams, useProjectId } from '../../lib/route'
 
 const PAGE_SIZE = 60
 const SOURCES: [string, string][] = [
-  ['', 'Semua sumber'],
+  ['', 'Semua sumber anotasi'],
   ['manual', 'Manual'],
   ['ai', 'AI (semua)'],
   ['ai:owlv2_text', 'AI: OWLv2 teks'],
   ['ai:owlv2_image', 'AI: OWLv2 contoh visual'],
   ['ai:grounding_dino', 'AI: Grounding DINO'],
+  ['import:yolo', 'Import YOLO'],
+  ['import:coco', 'Import COCO'],
 ]
 
 export function GalleryTab() {
@@ -67,6 +69,19 @@ export function GalleryTab() {
           {classes?.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className={`${inputClass} w-auto`}
+          value={filters.source_type ?? ''}
+          onChange={(e) => setParam('source_type', e.target.value)}
+          aria-label="Asal gambar"
+        >
+          <option value="">Semua asal gambar</option>
+          {Object.entries(IMAGE_SOURCE_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
             </option>
           ))}
         </select>

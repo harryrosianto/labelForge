@@ -195,6 +195,63 @@ def cmd_import_images(args) -> int:
     return 0
 
 
+def cmd_import_dataset(args) -> int:
+    """Import dataset YOLO/COCO dari ZIP atau folder. Class dipetakan otomatis berdasarkan nama."""
+    from sqlalchemy import select
+
+    from labelforge.db import get_session_factory
+    from labelforge.importers.apply import ClassMapping, apply_import, resolve_mapping, suggest_mapping
+    from labelforge.importers.base import DatasetReadError, open_source
+    from labelforge.importers.detect import parse_dataset
+    from labelforge.models import LabelClass, Project
+    from labelforge.storage import get_storage
+
+    session_factory = get_session_factory()
+    try:
+        source = open_source(args.input)
+        parsed = parse_dataset(source, args.format)
+    except DatasetReadError as e:
+        raise SystemExit(f"Error: {e}")
+
+    analysis = parsed.analysis()
+    print(f"Format {parsed.format}: {analysis['images']} gambar, {analysis['boxes']} box, "
+          f"split {analysis['splits']}")  # fmt: skip
+    for kind, info in analysis["problem_counts"].items():
+        print(f"  [masalah] {info['label']}: {info['count']}")
+
+    with session_factory() as db:
+        if db.get(Project, args.project_id) is None:
+            raise SystemExit(f"Project {args.project_id} tidak ditemukan")
+        existing = list(db.scalars(select(LabelClass).where(LabelClass.project_id == args.project_id)))
+        suggested = suggest_mapping(parsed.class_names, existing)
+        if not args.create_classes:
+            missing = [n for n, m in suggested.items() if m["action"] == "create"]
+            if missing:
+                raise SystemExit(f"Class belum ada di project: {missing}. Tambahkan --create-classes")
+        mapping = {n: ClassMapping(**m) for n, m in suggested.items()}
+        class_ids, created = resolve_mapping(db, args.project_id, parsed.class_names, mapping)
+        db.commit()
+    if created:
+        print(f"Class baru: {created}")
+
+    total = len(parsed.images)
+    done = [0]
+
+    def progress(**kw):
+        done[0] += 1
+        if kw.get("error"):
+            print(f"  [gagal] {kw['label']}: {kw['error']}")
+        if done[0] % 50 == 0 or done[0] == total:
+            print(f"  {done[0]}/{total}")
+
+    result = apply_import(session_factory, get_storage(), args.project_id, source, parsed, class_ids,
+                          mark_for_review=args.review, source_label=Path(args.input).name,
+                          on_item=progress)  # fmt: skip
+    source.close()
+    print(f"Selesai: {result}")
+    return 0
+
+
 def cmd_migrate(_args) -> int:
     """Upgrade schema DB ke versi terbaru; DB SQLite di-backup dulu jika ada migrasi baru."""
     import sqlite3
@@ -272,6 +329,16 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--project-id", type=int, required=True)
     i.add_argument("--input", required=True)
     i.set_defaults(func=cmd_import_images)
+
+    d2 = sub.add_parser("import-dataset", help="Import dataset YOLO/COCO (ZIP atau folder)")
+    d2.add_argument("--project-id", type=int, required=True)
+    d2.add_argument("--input", required=True, help="File ZIP atau folder dataset")
+    d2.add_argument("--format", choices=["yolo", "coco"], help="Default: deteksi otomatis")
+    d2.add_argument("--create-classes", action="store_true",
+                    help="Buat class yang belum ada (default: berhenti bila ada class baru)")
+    d2.add_argument("--review", action="store_true",
+                    help="Tandai untuk direview (auto_labeled, anotasi belum di-approve)")
+    d2.set_defaults(func=cmd_import_dataset)
 
     m = sub.add_parser("migrate", help="Upgrade schema DB (backup otomatis jika ada migrasi baru)")
     m.set_defaults(func=cmd_migrate)
