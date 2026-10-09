@@ -26,6 +26,7 @@ class JobType(StrEnum):
     VERSION_BUILD = "version_build"
     VIDEO_EXTRACT = "video_extract"
     RTSP_CAPTURE = "rtsp_capture"
+    EXPORT = "export"
     TRAIN = "train"  # Fase 3
 
 

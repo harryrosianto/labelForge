@@ -5,15 +5,20 @@ import zipfile
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, model_validator
 from starlette.background import BackgroundTask
 
 from labelforge.api.deps import DbSession, Storage, get_project_or_404
+from labelforge.api.routers.jobs import Queue
 from labelforge.exporters.base import ExportOptions, collect_dataset
 from labelforge.exporters.coco import write_coco
 from labelforge.exporters.yolo import write_yolo
+from labelforge.models import LabelingJob
+from labelforge.models.enums import JobStatus, JobType
+from labelforge.schemas.job import JobOut
+from labelforge.services.job_runner import create_job
 
 router = APIRouter(tags=["export"])
 WRITERS = {"yolo": write_yolo, "coco": write_coco}
@@ -72,3 +77,44 @@ def export_dataset(project_id: int, body: ExportRequest, db: DbSession, storage:
     filename = f"{slug}_{body.format}_{datetime.now():%Y%m%d-%H%M}.zip"
     return FileResponse(tmp_path, media_type="application/zip", filename=filename,
                         background=BackgroundTask(os.unlink, tmp_path))  # fmt: skip
+
+
+# --- export sebagai job (untuk dataset besar) -------------------------------------
+
+
+def enqueue_export(db: DbSession, queue: Queue, project_id: int, payload: dict) -> LabelingJob:
+    """Buat job export, commit, lalu kirim ke queue `io`. ZIP diunduh lewat /exports/{job_id}/download."""
+    job = create_job(db, project_id, JobType.EXPORT, payload)
+    db.commit()
+    try:
+        job.celery_task_id = queue.enqueue(JobType.EXPORT, job.id)
+    except Exception as e:
+        job.status, job.error = JobStatus.FAILED, f"Gagal mengirim job ke antrian: {e}"
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+@router.post("/projects/{project_id}/export-jobs", response_model=JobOut,
+             status_code=status.HTTP_201_CREATED)  # fmt: skip
+def start_export_job(project_id: int, body: ExportRequest, db: DbSession, queue: Queue):
+    get_project_or_404(db, project_id)
+    return enqueue_export(db, queue, project_id, body.model_dump())
+
+
+@router.get("/exports/{job_id}/download")
+def download_export(job_id: int, db: DbSession, storage: Storage):
+    """Unduh ZIP hasil job export (streaming dari disk, mendukung resume)."""
+    job = db.get(LabelingJob, job_id)
+    if job is None or job.job_type != JobType.EXPORT:
+        raise HTTPException(404, "Export tidak ditemukan")
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(409, f"Export berstatus {job.status}, belum bisa diunduh")
+    result = job.result or {}
+    key = result.get("file")
+    if not key or result.get("expired") or not storage.exists(key):
+        raise HTTPException(410, "File export sudah dihapus; buat export baru")
+    path = storage.local_file_for_response(key)
+    if path is None:
+        raise HTTPException(501, "Storage ini tidak mendukung unduhan langsung")
+    return FileResponse(path, media_type="application/zip", filename=result["filename"])

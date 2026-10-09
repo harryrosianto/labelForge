@@ -188,13 +188,14 @@ Opsi lain: `--param class_agnostic_nms=true`, `--device cpu|cuda`, `--fp16`, `--
 |---|---|---|
 | Import dataset YOLO/COCO | Upload → Import dataset | ZIP dianalisis dulu (jumlah, split, daftar masalah), lalu class dipetakan ke class yang ada, dibuat baru, atau diabaikan. Duplikat dilewati. CLI: `python -m labelforge.cli import-dataset --project-id N --input <zip/folder> --create-classes` |
 | Versi dataset | Versi | Snapshot tidak bisa diubah (manifest gambar + salinan anotasi). Gambar yang dipakai versi tidak bisa dihapus. Export dari versi menghasilkan ZIP identik setiap unduhan |
+| Export | Export, detail versi | ZIP dibuat di worker (queue `io`) dengan progress, lalu diunduh lewat link biasa sehingga dataset gigabyte tidak membebani browser. File disimpan 7 hari |
 | Preprocessing | Versi → Buat versi | Resize fit (letterbox) atau stretch; koordinat box ikut ditransformasi |
 | Augmentasi | Versi → Buat versi | Hanya split train, 1-5 salinan per gambar, dengan pratinjau. Diimplementasikan sendiri (numpy + OpenCV); hasil sama untuk seed yang sama |
 | Statistik | Overview, detail versi | Keseimbangan class, ukuran & rasio box, box per gambar, heatmap posisi, peringatan otomatis |
 | Video | Upload → Video | Ekstraksi frame tiap N detik / N fps; frame yang hampir sama dilewati (dHash) |
 | Kamera RTSP | Kamera | Tes koneksi, capture berkala dengan sambung ulang otomatis. URL dienkripsi dengan `SECRET_KEY` di `.env` dan hanya ditampilkan tersamarkan |
 
-Job berat (import, buat versi, video, kamera) berjalan di queue `io`; auto-label di queue
+Job berat (import, buat versi, export, video, kamera) berjalan di queue `io`; auto-label di queue
 `inference`. Di Docker keduanya dilayani service terpisah (`worker` dan `worker-io`). Status
 worker di header berasal dari heartbeat di Redis dan menyebut queue yang tidak punya worker.
 
@@ -208,9 +209,7 @@ Jangan mengganti kunci setelah kamera ditambahkan; URL lama tidak bisa dibuka la
 
 **Training di Colab (sementara, sebelum Fase 3):** buat versi (resize fit 640, tanpa augmentasi
 karena framework training sudah mengaugmentasi), unduh ZIP YOLO, unggah ke Google Drive, lalu
-di Colab ubah baris `path:` di `data.yaml` menjadi folder hasil unzip. Untuk dataset besar unduh
-dengan `curl -X POST http://localhost:8000/api/versions/<id>/export -H "Content-Type: application/json" -d '{"format":"yolo"}' -o dataset.zip`
-agar tidak ditampung di memori browser.
+di Colab ubah baris `path:` di `data.yaml` menjadi folder hasil unzip.
 
 ## Menambah provider baru
 

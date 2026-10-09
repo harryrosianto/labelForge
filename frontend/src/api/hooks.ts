@@ -167,8 +167,8 @@ export function useJobs(projectId: number) {
     queryKey: keys.jobs(projectId),
     queryFn: async () => {
       const jobs = await api<Job[]>(`/projects/${projectId}/jobs`)
-      // Selama ada job berjalan, galeri & statistik ikut diperbarui.
-      if (jobs.some(isActive)) {
+      // Selama ada job berjalan, galeri & statistik ikut diperbarui (export tidak mengubah data).
+      if (jobs.some((j) => isActive(j) && j.job_type !== 'export')) {
         qc.invalidateQueries({ queryKey: keys.images(projectId) })
         qc.invalidateQueries({ queryKey: keys.stats(projectId) })
       }
@@ -400,6 +400,15 @@ export const useExtractPreview = (videoId: number, options: ExtractOptions, enab
     enabled,
     placeholderData: keepPreviousData,
   })
+
+/** Mulai export di worker. path: /projects/{id}/export-jobs atau /versions/{id}/export-jobs. */
+export function useStartExport(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, body }: { path: string; body: object }) => api<Job>(path, json('POST', body)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.jobs(projectId) }),
+  })
+}
 
 export function useStartExtract(projectId: number) {
   const qc = useQueryClient()

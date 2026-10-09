@@ -24,6 +24,7 @@ export const JOB_TYPE_LABELS: Record<JobType, string> = {
   version_build: 'Buat versi',
   video_extract: 'Ekstraksi video',
   rtsp_capture: 'Capture kamera',
+  export: 'Export dataset',
   train: 'Training',
 }
 

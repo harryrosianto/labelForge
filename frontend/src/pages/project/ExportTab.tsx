@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api, json } from '../../api/client'
-import { useProject } from '../../api/hooks'
+import { useJobs, useProject, useStartExport } from '../../api/hooks'
+import { ExportJobs } from '../../components/ExportJobs'
 import { Button, ErrorText, Field, inputClass, Spinner } from '../../components/ui'
-import { downloadPost } from '../../lib/download'
 import { useProjectId } from '../../lib/route'
 
 type Format = 'yolo' | 'coco'
@@ -29,8 +29,10 @@ export function ExportTab() {
   const [reviewedOnly, setReviewedOnly] = useState(true)
   const [split, setSplit] = useState({ train: 80, val: 20, test: 0 })
   const [seed, setSeed] = useState(42)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<unknown>(null)
+  const start = useStartExport(id)
+  const { data: jobs = [] } = useJobs(id)
+  const exportJobs = jobs.filter((j) => j.job_type === 'export' && !j.payload?.version_id)
+  const running = exportJobs.some((j) => j.status === 'queued' || j.status === 'running')
 
   const total = split.train + split.val + split.test
   const body = {
@@ -51,17 +53,9 @@ export function ExportTab() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,28rem)_1fr]">
       <form
         className="space-y-5 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault()
-          setBusy(true)
-          setError(null)
-          try {
-            await downloadPost(`/projects/${id}/export`, body)
-          } catch (err) {
-            setError(err)
-          } finally {
-            setBusy(false)
-          }
+          start.mutate({ path: `/projects/${id}/export-jobs`, body })
         }}
       >
         <h2 className="font-semibold">Export dataset</h2>
@@ -121,10 +115,12 @@ export function ExportTab() {
           <input type="number" className={`${inputClass} w-32`} value={seed} onChange={(e) => setSeed(Number(e.target.value))} />
         </Field>
 
-        <ErrorText error={error} />
-        <Button type="submit" variant="primary" className="w-full" disabled={busy || !valid || !preview.data?.images}>
-          {busy && <Spinner />} Download ZIP
+        <ErrorText error={start.error} />
+        <Button type="submit" variant="primary" className="w-full" disabled={start.isPending || running || !valid || !preview.data?.images}>
+          {(start.isPending || running) && <Spinner />} Buat ZIP
         </Button>
+        <p className="text-xs text-slate-500">ZIP dibuat di worker, lalu muncul link unduh di bawah. File disimpan 7 hari.</p>
+        <ExportJobs jobs={exportJobs} />
       </form>
 
       <section className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">

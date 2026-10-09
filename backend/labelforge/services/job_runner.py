@@ -32,6 +32,7 @@ HANDLER_MODULES: list[str] = [
     "labelforge.importers.job",
     "labelforge.versions.job",
     "labelforge.media.job",
+    "labelforge.exporters.job",
 ]
 
 
@@ -67,6 +68,13 @@ class JobContext:
         with self.session_factory() as db:
             job = db.get(LabelingJob, self.job_id)
             job.warnings = [*(job.warnings or []), message]
+            db.commit()
+
+    def advance(self, n: int = 1) -> None:
+        """Majukan progress tanpa mencatat item (untuk langkah kecil yang sangat banyak)."""
+        with self.session_factory() as db:
+            db.execute(update(LabelingJob).where(LabelingJob.id == self.job_id)
+                       .values(processed=LabelingJob.processed + n))  # fmt: skip
             db.commit()
 
     def record(
