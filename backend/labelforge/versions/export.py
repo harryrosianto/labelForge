@@ -14,6 +14,7 @@ from labelforge.exporters.base import (
 )
 from labelforge.exporters.split import SPLITS
 from labelforge.models import DatasetVersion, Image, Project
+from labelforge.services.box_rows import version_rows
 from labelforge.versions.builder import file_extension, version_items
 
 
@@ -51,8 +52,8 @@ def version_dataset(db: Session, version: DatasetVersion, fmt: str) -> ExportDat
 def _manifest(db: Session, version: DatasetVersion) -> dict[tuple[int, int], tuple[str, list]]:
     names = [c["name"] for c in version.config["classes"]]
     return {
-        (it.image_id, it.variant): (it.split, sorted((names[int(b[0])], *b[1:]) for b in it.annotations))
-        for it in version_items(db, version.id)
+        (r.image_id, r.variant): (r.split, sorted((names[int(b[0])], *b[1:]) for b in r.annotations))
+        for r in version_rows(db, version.id)
     }
 
 

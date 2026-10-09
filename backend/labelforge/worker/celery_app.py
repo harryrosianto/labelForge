@@ -16,9 +16,10 @@ import logging
 import os
 
 from celery import Celery
-from celery.signals import worker_ready
+from celery.signals import worker_ready, worker_shutdown
 
 from labelforge.config import get_settings
+from labelforge.worker.heartbeat import Heartbeat
 
 log = logging.getLogger(__name__)
 settings = get_settings()
@@ -38,13 +39,32 @@ celery_app.conf.update(
 )
 
 
+_heartbeat: Heartbeat | None = None
+
+
 @worker_ready.connect
-def _preload_models(**_kwargs):
-    """Load model provider di awal agar job pertama tidak menunggu lama.
+def _on_ready(sender=None, **_kwargs):
+    """Mulai heartbeat (indikator worker di UI), lalu preload model.
     WORKER_PRELOAD=owlv2,grounding_dino (default: provider default di config; kosong = lazy)."""
+    global _heartbeat
+    queues = [q.name for q in sender.task_consumer.queues] if sender is not None else []
+    _heartbeat = Heartbeat(settings.redis_url, sender.hostname if sender else "worker", queues).start()
+    _preload_models()
+    _heartbeat.set_state("ready")
+
+
+@worker_shutdown.connect
+def _on_shutdown(**_kwargs):
+    if _heartbeat is not None:
+        _heartbeat.stop()
+
+
+def _preload_models() -> None:
     from labelforge.providers.registry import get_provider
 
     names = os.environ.get("WORKER_PRELOAD", settings.default_provider)
+    if names.strip() and _heartbeat is not None:
+        _heartbeat.set_state("loading_model")
     for name in filter(None, (n.strip() for n in names.split(","))):
         try:
             log.info("Preload model provider %s ...", name)

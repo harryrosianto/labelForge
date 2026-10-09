@@ -102,10 +102,10 @@ python -m venv .venv
 .venv/Scripts/activate                      # Linux/macOS: source .venv/bin/activate
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu   # atau cu126 untuk GPU
 pip install -e ".[ml,dev]"
-alembic upgrade head
+python -m labelforge.cli migrate            # upgrade schema DB; backup otomatis bila ada migrasi baru
 
 uvicorn labelforge.api.main:app --reload --port 8000                     # terminal 1
-celery -A labelforge.worker.celery_app worker --pool=solo -Q inference --loglevel=INFO   # terminal 2
+celery -A labelforge.worker.celery_app worker --pool=solo -Q inference,io --loglevel=INFO   # terminal 2
 
 # Frontend (terminal 3)
 cd frontend
@@ -114,6 +114,10 @@ npm run dev          # http://localhost:5173, /api diteruskan ke :8000
 ```
 
 Swagger API: http://localhost:8000/docs
+
+Di Windows, semua langkah menjalankan (Redis, migrasi, API, worker, frontend) cukup satu
+perintah dari root repo: `.\dev.ps1` (PowerShell) atau `dev` (Command Prompt). Matikan dengan
+`.\dev.ps1 -Stop`. Worker Celery tidak reload otomatis: restart setelah kode backend berubah.
 
 Test:
 
@@ -177,6 +181,36 @@ Opsi lain: `--param class_agnostic_nms=true`, `--device cpu|cuda`, `--fp16`, `--
    dengan seed. Default hanya gambar `reviewed`; gambar `unlabeled` tidak pernah diekspor
    (tanpa label ia akan terbaca sebagai gambar tanpa objek). Gambar reviewed tanpa box
    diekspor dengan file label kosong sebagai contoh negatif.
+
+## Fitur dataset (Fase 2)
+
+| Fitur | Tempat di UI | Catatan |
+|---|---|---|
+| Import dataset YOLO/COCO | Upload → Import dataset | ZIP dianalisis dulu (jumlah, split, daftar masalah), lalu class dipetakan ke class yang ada, dibuat baru, atau diabaikan. Duplikat dilewati. CLI: `python -m labelforge.cli import-dataset --project-id N --input <zip/folder> --create-classes` |
+| Versi dataset | Versi | Snapshot tidak bisa diubah (manifest gambar + salinan anotasi). Gambar yang dipakai versi tidak bisa dihapus. Export dari versi menghasilkan ZIP identik setiap unduhan |
+| Preprocessing | Versi → Buat versi | Resize fit (letterbox) atau stretch; koordinat box ikut ditransformasi |
+| Augmentasi | Versi → Buat versi | Hanya split train, 1-5 salinan per gambar, dengan pratinjau. Diimplementasikan sendiri (numpy + OpenCV); hasil sama untuk seed yang sama |
+| Statistik | Overview, detail versi | Keseimbangan class, ukuran & rasio box, box per gambar, heatmap posisi, peringatan otomatis |
+| Video | Upload → Video | Ekstraksi frame tiap N detik / N fps; frame yang hampir sama dilewati (dHash) |
+| Kamera RTSP | Kamera | Tes koneksi, capture berkala dengan sambung ulang otomatis. URL dienkripsi dengan `SECRET_KEY` di `.env` dan hanya ditampilkan tersamarkan |
+
+Job berat (import, buat versi, video, kamera) berjalan di queue `io`; auto-label di queue
+`inference`. Di Docker keduanya dilayani service terpisah (`worker` dan `worker-io`). Status
+worker di header berasal dari heartbeat di Redis dan menyebut queue yang tidak punya worker.
+
+**Kamera RTSP butuh `SECRET_KEY`.** Buat sekali lalu simpan di `.env` (bukan di `.env.example`):
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Jangan mengganti kunci setelah kamera ditambahkan; URL lama tidak bisa dibuka lagi.
+
+**Training di Colab (sementara, sebelum Fase 3):** buat versi (resize fit 640, tanpa augmentasi
+karena framework training sudah mengaugmentasi), unduh ZIP YOLO, unggah ke Google Drive, lalu
+di Colab ubah baris `path:` di `data.yaml` menjadi folder hasil unzip. Untuk dataset besar unduh
+dengan `curl -X POST http://localhost:8000/api/versions/<id>/export -H "Content-Type: application/json" -d '{"format":"yolo"}' -o dataset.zip`
+agar tidak ditampung di memori browser.
 
 ## Menambah provider baru
 

@@ -10,7 +10,7 @@ class JobQueue(Protocol):
 
     def revoke(self, task_id: str) -> None: ...
 
-    def ping_workers(self, timeout: float = 1.0) -> list[str]: ...
+    def ping_workers(self, timeout: float = 1.0) -> list[dict]: ...
 
 
 class CeleryJobQueue:
@@ -26,14 +26,15 @@ class CeleryJobQueue:
 
         celery_app.control.revoke(task_id)
 
-    def ping_workers(self, timeout: float = 1.0) -> list[str]:
-        from labelforge.worker.celery_app import celery_app
+    def ping_workers(self, timeout: float = 1.0) -> list[dict]:
+        """Worker aktif berdasarkan heartbeat di Redis (bukan broadcast ping Celery)."""
+        from labelforge.config import get_settings
+        from labelforge.worker.heartbeat import list_workers
 
         try:
-            replies = celery_app.control.ping(timeout=timeout) or []
+            return list_workers(get_settings().redis_url)
         except Exception:
             return []
-        return [name for reply in replies for name in reply]
 
 
 _queue: JobQueue = CeleryJobQueue()

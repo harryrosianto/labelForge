@@ -16,14 +16,36 @@ const tabs = [
   ['export', 'Export'],
 ] as const
 
+const QUEUE_LABELS: Record<string, string> = { inference: 'auto-label', io: 'import, versi, video & kamera' }
+
 function WorkerStatus() {
   const { data } = useHealth()
   if (!data) return null
-  const ok = data.workers.length > 0
+  const loading = data.worker_details.some((w) => w.state !== 'ready')
+  const missing = data.queues_without_worker
+  let tone = 'emerald'
+  let text = 'Worker aktif'
+  if (data.workers.length === 0) {
+    tone = 'amber'
+    text = 'Worker tidak aktif, job akan menunggu'
+  } else if (loading && missing.length) {
+    tone = 'sky'
+    text = 'Worker sedang memuat model…'
+  } else if (missing.length) {
+    tone = 'amber'
+    text = `Tidak ada worker untuk ${missing.map((q) => QUEUE_LABELS[q] ?? q).join(' dan ')}`
+  }
+  const colors: Record<string, [string, string]> = {
+    emerald: ['text-emerald-700', 'bg-emerald-500'],
+    amber: ['text-amber-700', 'bg-amber-500'],
+    sky: ['text-sky-700', 'bg-sky-500'],
+  }
+  const [textCls, dotCls] = colors[tone]
+  const tooltip = data.worker_details.map((w) => `${w.name}: ${w.queues.join(', ')} (${w.state})`).join('\n')
   return (
-    <span className={`flex items-center gap-1.5 text-xs ${ok ? 'text-emerald-700' : 'text-amber-700'}`}>
-      <span className={`h-2 w-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-      {ok ? 'Worker aktif' : 'Worker tidak aktif, job auto-label akan menunggu'}
+    <span className={`flex items-center gap-1.5 text-xs ${textCls}`} title={tooltip}>
+      <span className={`h-2 w-2 rounded-full ${dotCls}`} />
+      {text}
     </span>
   )
 }

@@ -48,8 +48,8 @@ class InlineQueue:
     def revoke(self, task_id: str) -> None:
         self.revoked.append(task_id)
 
-    def ping_workers(self, timeout: float = 1.0) -> list[str]:
-        return ["inline@test"]
+    def ping_workers(self, timeout: float = 1.0) -> list[dict]:
+        return [{"name": "inline@test", "queues": ["inference", "io"], "state": "ready"}]
 
 
 @pytest.fixture

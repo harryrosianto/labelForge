@@ -39,7 +39,14 @@ def create_app() -> FastAPI:
     def health(db: DbSession, queue: Annotated[JobQueue, Depends(get_job_queue)]):
         db.execute(text("SELECT 1"))
         workers = queue.ping_workers(timeout=1.0)
-        return {"status": "ok", "version": __version__, "db": "ok", "workers": workers}
+        served = {q for w in workers if w.get("state") == "ready" for q in w.get("queues", [])}
+        return {
+            "status": "ok", "version": __version__, "db": "ok",
+            "workers": [w["name"] for w in workers],
+            "worker_details": workers,
+            # Queue tanpa worker siap: job di queue itu akan menunggu.
+            "queues_without_worker": sorted({"inference", "io"} - served),
+        }  # fmt: skip
 
     return app
 

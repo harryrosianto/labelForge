@@ -149,11 +149,19 @@ export interface JobItem {
   duration_ms: number | null
 }
 
+export interface WorkerInfo {
+  name: string
+  queues: string[]
+  state: 'starting' | 'loading_model' | 'ready'
+}
+
 export interface Health {
   status: string
   version: string
   db: string
   workers: string[]
+  worker_details: WorkerInfo[]
+  queues_without_worker: string[]
 }
 
 export interface ImageFilters {
