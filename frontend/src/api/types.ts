@@ -170,6 +170,7 @@ export interface ImageFilters {
   class_id?: number
   source?: string
   max_conf?: number
+  audit_id?: number
 }
 
 export interface Exemplar {
@@ -342,4 +343,31 @@ export interface CaptureOptions {
   max_frames?: number | null
   dedup_threshold: number
   reconnect_attempts?: number
+}
+
+export interface BulkStatusResult {
+  matched: number
+  changed: number
+  without_boxes: number
+  skipped_unlabeled: number
+}
+
+export interface AuditSummary {
+  checked: number
+  approved_unchanged: number
+  corrected: number
+  pending: number
+  removed: number
+  error_rate: number | null
+}
+
+export interface Audit {
+  id: number
+  project_id: number
+  filters: ImageFilters
+  population: number
+  sample_size: number
+  seed: number
+  created_at: string
+  summary: AuditSummary
 }

@@ -5,6 +5,7 @@ from labelforge.models.job import LabelingJob, LabelingJobItem
 from labelforge.models.label_class import ClassExemplar, LabelClass
 from labelforge.models.media import CameraSource, DatasetImport, Video
 from labelforge.models.project import Project
+from labelforge.models.review import ReviewAudit, ReviewAuditItem
 from labelforge.models.version import DatasetVersion, DatasetVersionItem
 
 __all__ = [
@@ -21,5 +22,7 @@ __all__ = [
     "LabelingJobItem",
     "MLModel",
     "Project",
+    "ReviewAudit",
+    "ReviewAuditItem",
     "Video",
 ]

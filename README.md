@@ -188,6 +188,8 @@ Opsi lain: `--param class_agnostic_nms=true`, `--device cpu|cuda`, `--fp16`, `--
 |---|---|---|
 | Import dataset YOLO/COCO | Upload → Import dataset | ZIP dianalisis dulu (jumlah, split, daftar masalah), lalu class dipetakan ke class yang ada, dibuat baru, atau diabaikan. Duplikat dilewati. CLI: `python -m labelforge.cli import-dataset --project-id N --input <zip/folder> --create-classes` |
 | Versi dataset | Versi | Snapshot tidak bisa diubah (manifest gambar + salinan anotasi). Gambar yang dipakai versi tidak bisa dihapus. Export dari versi menghasilkan ZIP identik setiap unduhan |
+| Review massal | Galeri | Approve semua hasil filter atau gambar terpilih (auto-label → reviewed), dan sebaliknya. Konfirmasi menampilkan jumlah gambar; gambar belum berlabel tidak pernah diubah |
+| Audit sampel | Galeri → Audit sampel | Sampel acak gambar auto-label dari filter aktif diperiksa di editor (navigasi hanya di dalam sampel). Hasilnya perkiraan persentase label yang dikoreksi, sebagai dasar sebelum approve massal |
 | Export | Export, detail versi | ZIP dibuat di worker (queue `io`) dengan progress, lalu diunduh lewat link biasa sehingga dataset gigabyte tidak membebani browser. File disimpan 7 hari |
 | Preprocessing | Versi → Buat versi | Resize fit (letterbox) atau stretch; koordinat box ikut ditransformasi |
 | Augmentasi | Versi → Buat versi | Hanya split train, 1-5 salinan per gambar, dengan pratinjau. Diimplementasikan sendiri (numpy + OpenCV); hasil sama untuk seed yang sama |

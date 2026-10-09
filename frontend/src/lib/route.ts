@@ -15,5 +15,6 @@ export function filtersFromParams(params: URLSearchParams): ImageFilters {
     class_id: num('class_id'),
     source: params.get('source') || undefined,
     max_conf: num('max_conf'),
+    audit_id: num('audit_id'),
   }
 }
