@@ -114,9 +114,11 @@ function Editor({
       run(async () => {
         await persist(true)
         if (detail.next_id) navigate(`/projects/${projectId}/annotate/${detail.next_id}${qs}`)
+        // Akhir sampel audit: kembali ke galeri untuk melihat ringkasan hasil audit.
+        else if (filters.audit_id !== undefined) navigate(`/projects/${projectId}/gallery${qs}`)
         else setMessage({ text: 'Approved. Ini gambar terakhir dalam filter.' })
       }),
-    [run, persist, detail.next_id, navigate, projectId, qs],
+    [run, persist, detail.next_id, navigate, projectId, qs, filters.audit_id],
   )
 
   const saveOnly = useCallback(
@@ -202,6 +204,7 @@ function Editor({
         </span>
         {detail.position !== null && (
           <span className="text-slate-500">
+            {filters.audit_id !== undefined && <span className="mr-1 font-medium text-brand-700">Audit #{filters.audit_id}</span>}
             {detail.position} / {detail.filtered_total}
           </span>
         )}

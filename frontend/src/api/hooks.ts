@@ -3,7 +3,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { api, json, queryString } from './client'
 import { uploadWithProgress } from './upload'
 import type {
+  Audit,
   AugmentPreview,
+  BulkStatusResult,
   Camera,
   CaptureOptions,
   ExtractOptions,
@@ -450,5 +452,49 @@ export function useStartCapture(projectId: number) {
     mutationFn: ({ cameraId, options }: { cameraId: number; options: CaptureOptions }) =>
       api<Job>(`/cameras/${cameraId}/capture`, json('POST', options)),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.jobs(projectId) }),
+  })
+}
+
+// --- review massal & audit sampel --------------------------------------------
+
+export interface BulkStatusBody {
+  status: 'reviewed' | 'auto_labeled'
+  filters?: ImageFilters
+  image_ids?: number[]
+  dry_run?: boolean
+}
+
+export const bulkStatus = (projectId: number, body: BulkStatusBody) =>
+  api<BulkStatusResult>(`/projects/${projectId}/images/bulk-status`, json('POST', body))
+
+export function useBulkStatus(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BulkStatusBody) => bulkStatus(projectId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.project(projectId) })
+      qc.invalidateQueries({ queryKey: ['image'] })
+    },
+  })
+}
+
+const auditsKey = (projectId: number) => [...keys.project(projectId), 'audits'] as const
+
+export const useAudits = (projectId: number) =>
+  useQuery({ queryKey: auditsKey(projectId), queryFn: () => api<Audit[]>(`/projects/${projectId}/audits`) })
+
+export function useCreateAudit(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { filters: ImageFilters; size: number }) => api<Audit>(`/projects/${projectId}/audits`, json('POST', body)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: auditsKey(projectId) }),
+  })
+}
+
+export function useDeleteAudit(projectId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (auditId: number) => api<void>(`/audits/${auditId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: auditsKey(projectId) }),
   })
 }

@@ -78,3 +78,4 @@ class ImageFilters(BaseModel):
     source: str | None = Field(default=None, description='"manual", "ai" (semua AI), atau tag lengkap')
     max_conf: float | None = Field(default=None, ge=0, le=1,
                                    description="Punya box AI belum di-approve dengan confidence < nilai ini")  # fmt: skip
+    audit_id: int | None = Field(default=None, description="Hanya gambar sampel audit ini")

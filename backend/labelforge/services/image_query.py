@@ -3,7 +3,7 @@
 from sqlalchemy import Select, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from labelforge.models import Annotation, Image
+from labelforge.models import Annotation, Image, ReviewAuditItem
 from labelforge.schemas.image import ImageFilters
 
 
@@ -13,6 +13,9 @@ def filtered_images(project_id: int, f: ImageFilters) -> Select:
         query = query.where(Image.status == f.status)
     if f.source_type:
         query = query.where(Image.source_type == f.source_type)
+    if f.audit_id is not None:
+        sample = select(ReviewAuditItem.image_id).where(ReviewAuditItem.audit_id == f.audit_id)
+        query = query.where(Image.id.in_(sample))
 
     ann = select(Annotation.id).where(Annotation.image_id == Image.id)
     if f.class_id is not None:

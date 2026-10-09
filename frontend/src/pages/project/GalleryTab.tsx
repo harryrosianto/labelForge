@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useClasses, useDeleteImages, useImages } from '../../api/hooks'
+import type { Audit } from '../../api/types'
 import { ImageThumb } from '../../components/ImageThumb'
+import { AuditBanner, AuditPanel, BulkStatusButtons } from '../../components/ReviewTools'
 import { IMAGE_SOURCE_LABELS, IMAGE_STATUS_LABELS } from '../../lib/labels'
 import { Button, EmptyState, ErrorText, inputClass, Spinner } from '../../components/ui'
 import { filtersFromParams, useProjectId } from '../../lib/route'
@@ -29,6 +31,7 @@ export function GalleryTab() {
   const { data: classes } = useClasses(id)
   const remove = useDeleteImages(id)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [auditOpen, setAuditOpen] = useState(false)
 
   const classMap = useMemo(() => new Map(classes?.map((c) => [c.id, c])), [classes])
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
@@ -40,6 +43,24 @@ export function GalleryTab() {
     if (key !== 'page') next.delete('page')
     setParams(next)
     setSelected(new Set())
+  }
+
+  const replaceParams = (values: Record<string, string | number | undefined>) => {
+    const next = new URLSearchParams()
+    for (const [k, v] of Object.entries(values)) if (v !== undefined && v !== '') next.set(k, String(v))
+    setParams(next)
+    setSelected(new Set())
+  }
+
+  const openEditor = (imageId: number) => {
+    const q = new URLSearchParams(params)
+    q.delete('page')
+    navigate(`/projects/${id}/annotate/${imageId}${q.size ? `?${q}` : ''}`)
+  }
+
+  const openAudit = (audit: Audit) => {
+    setAuditOpen(false)
+    replaceParams({ audit_id: audit.id })
   }
 
   const toggle = (imageId: number) =>
@@ -115,6 +136,20 @@ export function GalleryTab() {
         <span className="ml-auto text-sm text-slate-500">{data?.total ?? 0} gambar</span>
       </div>
 
+      {filters.audit_id !== undefined && (
+        <AuditBanner
+          projectId={id}
+          auditId={filters.audit_id}
+          onReview={() => {
+            const first = data?.items.find((i) => i.status !== 'reviewed') ?? data?.items[0]
+            if (first) openEditor(first.id)
+          }}
+          onShowPopulation={(audit) => replaceParams({ ...audit.filters, status: 'auto_labeled' })}
+          onExit={() => setParam('audit_id', '')}
+        />
+      )}
+      {auditOpen && <AuditPanel projectId={id} filters={filters} onOpen={openAudit} />}
+
       {selected.size > 0 && (
         <div className="flex items-center gap-2 rounded-md bg-brand-50 px-3 py-2 text-sm">
           <span className="font-medium text-brand-800">{selected.size} dipilih</span>
@@ -124,6 +159,7 @@ export function GalleryTab() {
           >
             Auto-label terpilih
           </Button>
+          <BulkStatusButtons projectId={id} filters={{}} imageIds={[...selected]} onDone={() => setSelected(new Set())} />
           <Button
             variant="danger"
             disabled={remove.isPending}
@@ -146,9 +182,16 @@ export function GalleryTab() {
         </div>
       )}
       {data && data.items.length > 0 && selected.size === 0 && (
-        <Button variant="ghost" onClick={() => setSelected(new Set(data.items.map((i) => i.id)))}>
-          Pilih semua di halaman ini
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" onClick={() => setSelected(new Set(data.items.map((i) => i.id)))}>
+            Pilih semua di halaman ini
+          </Button>
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+          <BulkStatusButtons projectId={id} filters={filters} />
+          <Button variant="ghost" className="ml-auto" onClick={() => setAuditOpen((v) => !v)}>
+            {auditOpen ? 'Tutup audit' : 'Audit sampel…'}
+          </Button>
+        </div>
       )}
 
       <ErrorText error={error ?? remove.error} />
@@ -173,11 +216,7 @@ export function GalleryTab() {
             classes={classMap}
             selected={selected.has(img.id)}
             onToggle={() => toggle(img.id)}
-            onOpen={() => {
-              const q = new URLSearchParams(params)
-              q.delete('page')
-              navigate(`/projects/${id}/annotate/${img.id}${q.size ? `?${q}` : ''}`)
-            }}
+            onOpen={() => openEditor(img.id)}
           />
         ))}
       </div>
