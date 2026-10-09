@@ -7,6 +7,7 @@ import {
   useCreateVersion,
   useDeleteVersion,
   useJobs,
+  useStartExport,
   useUpdateVersion,
   useVersionPreview,
   useVersions,
@@ -16,8 +17,8 @@ import type { AugmentationConfig, DatasetVersion, Preprocessing, VersionSettings
 import { AugmentationSettings } from '../../components/AugmentationSettings'
 import { DEFAULT_AUGMENTATION, describeAugmentation } from '../../lib/augmentation'
 import { DatasetStats } from '../../components/DatasetStats'
+import { ExportJobs } from '../../components/ExportJobs'
 import { Button, EmptyState, ErrorText, Field, inputClass, Spinner } from '../../components/ui'
-import { downloadPost } from '../../lib/download'
 import { useProjectId } from '../../lib/route'
 
 const STATUS: Record<DatasetVersion['status'], [string, string]> = {
@@ -231,21 +232,10 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
   const remove = useDeleteVersion(projectId)
   const { data: jobs = [] } = useJobs(projectId)
   const job = version.job_id ? jobs.find((j) => j.id === version.job_id) : undefined
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<unknown>(null)
+  const start = useStartExport(projectId)
+  const exportJobs = jobs.filter((j) => j.job_type === 'export' && j.payload?.version_id === version.id)
+  const exporting = exportJobs.some((j) => j.status === 'queued' || j.status === 'running')
   const cfg = version.config
-
-  const download = async (format: 'yolo' | 'coco') => {
-    setBusy(format)
-    setError(null)
-    try {
-      await downloadPost(`/versions/${version.id}/export`, { format })
-    } catch (e) {
-      setError(e)
-    } finally {
-      setBusy(null)
-    }
-  }
 
   return (
     <div className="space-y-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -319,13 +309,22 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
 
       {version.status === 'ready' && <VersionStatsPanel versionId={version.id} />}
 
-      <ErrorText error={error ?? update.error ?? remove.error} />
-      <div className="flex gap-2 border-t border-slate-100 pt-3">
-        {(['yolo', 'coco'] as const).map((f) => (
-          <Button key={f} variant={f === 'yolo' ? 'primary' : 'secondary'} disabled={version.status !== 'ready' || busy !== null} onClick={() => download(f)}>
-            {busy === f && <Spinner />} Download {f.toUpperCase()}
-          </Button>
-        ))}
+      <ErrorText error={start.error ?? update.error ?? remove.error} />
+      <div className="space-y-3 border-t border-slate-100 pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {(['yolo', 'coco'] as const).map((f) => (
+            <Button
+              key={f}
+              variant={f === 'yolo' ? 'primary' : 'secondary'}
+              disabled={version.status !== 'ready' || start.isPending || exporting}
+              onClick={() => start.mutate({ path: `/versions/${version.id}/export-jobs`, body: { format: f } })}
+            >
+              Export {f.toUpperCase()}
+            </Button>
+          ))}
+          {exporting && <Spinner />}
+        </div>
+        <ExportJobs jobs={exportJobs} limit={3} />
       </div>
     </div>
   )

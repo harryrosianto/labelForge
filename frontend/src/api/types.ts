@@ -4,7 +4,7 @@ export type ImageStatus = 'unlabeled' | 'auto_labeled' | 'reviewed'
 export type ImageSource = 'upload' | 'import' | 'video' | 'rtsp'
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type JobTarget = 'all' | 'unlabeled' | 'selected'
-export type JobType = 'autolabel' | 'import' | 'version_build' | 'video_extract' | 'rtsp_capture' | 'train'
+export type JobType = 'autolabel' | 'import' | 'version_build' | 'video_extract' | 'rtsp_capture' | 'export' | 'train'
 
 export interface Project {
   id: number

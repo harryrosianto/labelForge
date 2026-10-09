@@ -6,6 +6,7 @@ annotations/instances_{split}.json   bbox = [x, y, w, h] pixel, category_id mula
 
 import json
 import zipfile
+from collections.abc import Callable
 
 from labelforge.core.formats import box_area, norm_to_xyxy_px, xyxy_px_to_coco
 from labelforge.exporters.base import ExportDataset, export_info, write_bytes, write_text
@@ -45,11 +46,14 @@ def coco_json(dataset: ExportDataset, split: str) -> dict:
     }  # fmt: skip
 
 
-def write_coco(dataset: ExportDataset, storage: StorageBackend, zf: zipfile.ZipFile) -> None:
+def write_coco(dataset: ExportDataset, storage: StorageBackend, zf: zipfile.ZipFile,
+               on_image: Callable[[], None] | None = None) -> None:  # fmt: skip
     for split, imgs in dataset.splits.items():
         if not imgs:
             continue
         for img in imgs:
             write_bytes(zf, f"images/{split}/{img.file_name}", storage.read_bytes(img.storage_key))
+            if on_image:
+                on_image()
         write_text(zf, f"annotations/instances_{split}.json", json.dumps(coco_json(dataset, split)))
     write_text(zf, "export_info.json", json.dumps(export_info(dataset), indent=2))

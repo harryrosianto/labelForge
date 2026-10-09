@@ -1,6 +1,8 @@
 import { useCancelJob } from '../api/hooks'
 import type { Job } from '../api/types'
 import { JobStatusBadge } from './StatusBadge'
+import type { ReactNode } from 'react'
+
 import { Button } from './ui'
 
 const RESULT_LABELS: Record<string, string> = {
@@ -11,7 +13,7 @@ const RESULT_LABELS: Record<string, string> = {
 }
 
 /** Baris status job: badge, progress, ringkasan hasil, peringatan, error, tombol batal. */
-export function JobProgress({ job, title }: { job: Job; title?: string }) {
+export function JobProgress({ job, title, children }: { job: Job; title?: string; children?: ReactNode }) {
   const cancel = useCancelJob(job.project_id)
   const active = job.status === 'queued' || job.status === 'running'
   const result = (job.result ?? {}) as Record<string, number>
@@ -47,6 +49,7 @@ export function JobProgress({ job, title }: { job: Job; title?: string }) {
         </p>
       ))}
       {job.error && <p className="mt-1 text-rose-600">{job.error}</p>}
+      {children}
     </div>
   )
 }

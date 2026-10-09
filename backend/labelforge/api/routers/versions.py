@@ -12,10 +12,11 @@ from sqlalchemy import select
 from starlette.background import BackgroundTask
 
 from labelforge.api.deps import DbSession, Storage, get_project_or_404
-from labelforge.api.routers.export import WRITERS
+from labelforge.api.routers.export import WRITERS, enqueue_export
 from labelforge.api.routers.jobs import Queue
 from labelforge.models import DatasetVersion
 from labelforge.models.enums import JobStatus, JobType, VersionStatus
+from labelforge.schemas.job import JobOut
 from labelforge.services.job_runner import create_job
 from labelforge.storage import project_prefix
 from labelforge.versions.builder import (
@@ -175,3 +176,14 @@ def export_version(version_id: int, body: VersionExport, db: DbSession, storage:
     slug = re.sub(r"[^a-z0-9]+", "-", f"{dataset.project.name}-{version.name}".lower()).strip("-")
     return FileResponse(tmp_path, media_type="application/zip", filename=f"{slug}_{body.format}.zip",
                         background=BackgroundTask(os.unlink, tmp_path))  # fmt: skip
+
+
+@router.post("/versions/{version_id}/export-jobs", response_model=JobOut,
+             status_code=status.HTTP_201_CREATED)  # fmt: skip
+def start_version_export_job(version_id: int, body: VersionExport, db: DbSession, queue: Queue):
+    """Export versi di worker; ZIP-nya identik dengan /versions/{id}/export."""
+    version = _get_version(db, version_id)
+    if version.status != VersionStatus.READY:
+        raise HTTPException(409, f"Versi berstatus {version.status}, belum bisa diekspor")
+    return enqueue_export(db, queue, version.project_id,
+                          {"format": body.format, "version_id": version.id, "version": version.name})  # fmt: skip
