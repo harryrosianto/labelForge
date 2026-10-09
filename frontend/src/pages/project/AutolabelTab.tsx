@@ -114,7 +114,7 @@ function JobRow({ job }: { job: Job }) {
         <ul className="mt-1 max-h-40 overflow-auto text-xs text-slate-600">
           {errors?.map((e) => (
             <li key={e.id}>
-              Gambar #{e.image_id}: {e.error}
+              {e.image_id ? `Gambar #${e.image_id}` : e.label}: {e.error}
             </li>
           ))}
         </ul>
@@ -148,6 +148,7 @@ export function AutolabelTab() {
 
   const params: Params = { ...defaults(specs), ...overrides }
 
+  const autolabelJobs = (jobs ?? []).filter((j) => j.job_type === 'autolabel')
   const imageGuided = activeMode?.endsWith('image_guided')
   const withoutExemplar = imageGuided ? (classes ?? []).filter((c) => c.exemplar_count === 0) : []
   const noClasses = classes?.length === 0
@@ -254,9 +255,9 @@ export function AutolabelTab() {
 
       <section>
         <h2 className="mb-3 font-semibold">Riwayat job</h2>
-        {!jobs?.length && <p className="text-sm text-slate-500">Belum ada job.</p>}
+        {!autolabelJobs.length && <p className="text-sm text-slate-500">Belum ada job.</p>}
         <ul className="space-y-2">
-          {jobs?.map((j) => (
+          {autolabelJobs.map((j) => (
             <JobRow key={j.id} job={j} />
           ))}
         </ul>

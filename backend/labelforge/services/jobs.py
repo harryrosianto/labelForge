@@ -15,6 +15,7 @@ from labelforge.models.enums import ImageStatus, JobItemStatus, JobStatus, JobTa
 from labelforge.providers.base import ClassDef, ProviderError
 from labelforge.providers.registry import get_provider, get_provider_class
 from labelforge.services.annotations import apply_ai_detections
+from labelforge.services.job_runner import register_job_handler
 from labelforge.storage import StorageBackend
 
 log = logging.getLogger(__name__)
@@ -209,3 +210,12 @@ def run_autolabel_job(
             job.status, job.error = JobStatus.FAILED, "Semua gambar gagal diproses"
         db.commit()
         return job.status
+
+
+def _autolabel_handler(job_id: int, session_factory: sessionmaker[Session], storage: StorageBackend) -> str:
+    return run_autolabel_job(job_id, session_factory, storage)
+
+
+# Autolabel mengatur status & item job sendiri (lihat run_autolabel_job).
+_autolabel_handler.manages_status = True  # type: ignore[attr-defined]
+register_job_handler(JobType.AUTOLABEL)(_autolabel_handler)

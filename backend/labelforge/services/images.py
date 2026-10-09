@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from labelforge.config import get_settings
+from labelforge.media.dedup import dhash
 from labelforge.models import Image
 from labelforge.storage import StorageBackend, project_prefix
 
@@ -87,6 +88,7 @@ def ingest_image(
         width=img.width,
         height=img.height,
         sha256=sha256,
+        dhash=dhash(thumb),
     )
     db.add(image)
     db.flush()

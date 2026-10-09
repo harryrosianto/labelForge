@@ -1,4 +1,4 @@
-import type { ImageStatus, JobStatus } from '../api/types'
+import type { ImageSource, ImageStatus, JobStatus, JobType } from '../api/types'
 
 export const IMAGE_STATUS: Record<ImageStatus, [label: string, className: string]> = {
   unlabeled: ['Belum berlabel', 'bg-slate-100 text-slate-600'],
@@ -17,3 +17,19 @@ export const JOB_STATUS: Record<JobStatus, [label: string, className: string]> =
 export const IMAGE_STATUS_LABELS = Object.fromEntries(
   Object.entries(IMAGE_STATUS).map(([k, [label]]) => [k, label]),
 ) as Record<ImageStatus, string>
+
+export const JOB_TYPE_LABELS: Record<JobType, string> = {
+  autolabel: 'Auto-label',
+  import: 'Import dataset',
+  version_build: 'Buat versi',
+  video_extract: 'Ekstraksi video',
+  rtsp_capture: 'Capture kamera',
+  train: 'Training',
+}
+
+export const IMAGE_SOURCE_LABELS: Record<ImageSource, string> = {
+  upload: 'Upload',
+  import: 'Import dataset',
+  video: 'Video',
+  rtsp: 'Kamera',
+}

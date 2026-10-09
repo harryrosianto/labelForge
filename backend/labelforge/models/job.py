@@ -15,7 +15,7 @@ class LabelingJob(Base):
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     job_type: Mapped[str] = mapped_column(String(32), default=JobType.AUTOLABEL)
-    provider: Mapped[str] = mapped_column(String(64))
+    provider: Mapped[str | None] = mapped_column(String(64))  # hanya job autolabel
     mode: Mapped[str | None] = mapped_column(String(32))
     params: Mapped[dict] = mapped_column(JSON, default=dict)
     target: Mapped[str] = mapped_column(String(16), default=JobTarget.UNLABELED)
@@ -26,6 +26,8 @@ class LabelingJob(Base):
     processed: Mapped[int] = mapped_column(Integer, default=0)
     failed_count: Mapped[int] = mapped_column(Integer, default=0)
     warnings: Mapped[list] = mapped_column(JSON, default=list)
+    payload: Mapped[dict | None] = mapped_column(JSON)  # input job non-autolabel
+    result: Mapped[dict | None] = mapped_column(JSON)  # ringkasan hasil
     error: Mapped[str | None] = mapped_column(Text)
     celery_task_id: Mapped[str | None] = mapped_column(String(64))
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -45,7 +47,8 @@ class LabelingJobItem(Base):
     job_id: Mapped[int] = mapped_column(
         ForeignKey("labeling_jobs.id", ondelete="CASCADE"), index=True
     )
-    image_id: Mapped[int] = mapped_column(ForeignKey("images.id", ondelete="CASCADE"))
+    image_id: Mapped[int | None] = mapped_column(ForeignKey("images.id", ondelete="CASCADE"))
+    label: Mapped[str | None] = mapped_column(String(500))  # nama file / frame bila tanpa gambar
     status: Mapped[str] = mapped_column(String(16), default=JobItemStatus.PENDING)
     num_detections: Mapped[int | None] = mapped_column(Integer)
     error: Mapped[str | None] = mapped_column(Text)

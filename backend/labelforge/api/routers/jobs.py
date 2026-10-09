@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from labelforge.api.deps import DbSession, Storage, get_project_or_404
 from labelforge.models import LabelingJob, LabelingJobItem
-from labelforge.models.enums import JobItemStatus, JobStatus
+from labelforge.models.enums import JobItemStatus, JobStatus, JobType
 from labelforge.providers.registry import describe_providers
 from labelforge.schemas.job import AutolabelJobCreate, JobItemOut, JobOut
 from labelforge.services.jobs import JobRequestError, create_autolabel_job
@@ -52,7 +52,7 @@ def start_autolabel(
     db.commit()  # job harus sudah tersimpan sebelum worker mengambilnya
 
     try:
-        job.celery_task_id = queue.enqueue_autolabel(job.id)
+        job.celery_task_id = queue.enqueue(JobType.AUTOLABEL, job.id)
     except Exception as e:
         job.status, job.error = JobStatus.FAILED, f"Gagal mengirim job ke antrian: {e}"
     db.commit()

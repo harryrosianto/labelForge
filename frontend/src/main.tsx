@@ -7,12 +7,14 @@ import './index.css'
 import { EditorPage } from './pages/EditorPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { AutolabelTab } from './pages/project/AutolabelTab'
+import { CamerasTab } from './pages/project/CamerasTab'
 import { ClassesTab } from './pages/project/ClassesTab'
 import { ExportTab } from './pages/project/ExportTab'
 import { GalleryTab } from './pages/project/GalleryTab'
 import { OverviewTab } from './pages/project/OverviewTab'
 import { ProjectLayout } from './pages/project/ProjectLayout'
 import { UploadTab } from './pages/project/UploadTab'
+import { VersionsTab } from './pages/project/VersionsTab'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } },
@@ -27,8 +29,10 @@ const router = createBrowserRouter([
       { index: true, element: <OverviewTab /> },
       { path: 'classes', element: <ClassesTab /> },
       { path: 'upload', element: <UploadTab /> },
+      { path: 'cameras', element: <CamerasTab /> },
       { path: 'gallery', element: <GalleryTab /> },
       { path: 'autolabel', element: <AutolabelTab /> },
+      { path: 'versions', element: <VersionsTab /> },
       { path: 'export', element: <ExportTab /> },
     ],
   },

@@ -9,7 +9,7 @@ import json
 import zipfile
 
 from labelforge.core.formats import format_yolo_line
-from labelforge.exporters.base import ExportDataset, export_info, write_text
+from labelforge.exporters.base import ExportDataset, export_info, write_bytes, write_text
 from labelforge.storage import StorageBackend
 
 
@@ -38,8 +38,7 @@ def label_text(boxes) -> str:
 def write_yolo(dataset: ExportDataset, storage: StorageBackend, zf: zipfile.ZipFile) -> None:
     for split, images in dataset.splits.items():
         for img in images:
-            zf.writestr(f"images/{split}/{img.file_name}", storage.read_bytes(img.storage_key),
-                        compress_type=zipfile.ZIP_STORED)  # fmt: skip
+            write_bytes(zf, f"images/{split}/{img.file_name}", storage.read_bytes(img.storage_key))
             stem = img.file_name.rsplit(".", 1)[0]
             # File label kosong = gambar tanpa objek (contoh negatif), tetap ditulis.
             write_text(zf, f"labels/{split}/{stem}.txt", label_text(img.boxes))

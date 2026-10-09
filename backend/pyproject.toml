@@ -19,6 +19,9 @@ dependencies = [
     "numpy>=1.26",
     "httpx>=0.27",
     "celery[redis]>=5.4",
+    "opencv-python-headless>=4.10",  # video/RTSP & augmentasi (Apache 2.0)
+    "pyyaml>=6",  # data.yaml saat import YOLO
+    "cryptography>=42",  # enkripsi URL kamera RTSP
 ]
 
 [project.optional-dependencies]

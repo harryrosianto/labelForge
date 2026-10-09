@@ -3,6 +3,7 @@ import shutil
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import BinaryIO
 
 from labelforge.storage.base import StorageBackend
 
@@ -24,6 +25,15 @@ class LocalStorage(StorageBackend):
         tmp = path.with_name(path.name + ".tmp")
         tmp.write_bytes(data)
         os.replace(tmp, path)
+
+    def save_file(self, key: str, fileobj: BinaryIO) -> int:
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        with open(tmp, "wb") as out:
+            shutil.copyfileobj(fileobj, out, length=1024 * 1024)
+        os.replace(tmp, path)
+        return path.stat().st_size
 
     def read_bytes(self, key: str) -> bytes:
         return self._path(key).read_bytes()

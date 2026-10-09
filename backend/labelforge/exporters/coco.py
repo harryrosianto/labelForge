@@ -8,7 +8,7 @@ import json
 import zipfile
 
 from labelforge.core.formats import box_area, norm_to_xyxy_px, xyxy_px_to_coco
-from labelforge.exporters.base import ExportDataset, export_info, write_text
+from labelforge.exporters.base import ExportDataset, export_info, write_bytes, write_text
 from labelforge.storage import StorageBackend
 
 
@@ -50,7 +50,6 @@ def write_coco(dataset: ExportDataset, storage: StorageBackend, zf: zipfile.ZipF
         if not imgs:
             continue
         for img in imgs:
-            zf.writestr(f"images/{split}/{img.file_name}", storage.read_bytes(img.storage_key),
-                        compress_type=zipfile.ZIP_STORED)  # fmt: skip
+            write_bytes(zf, f"images/{split}/{img.file_name}", storage.read_bytes(img.storage_key))
         write_text(zf, f"annotations/instances_{split}.json", json.dumps(coco_json(dataset, split)))
     write_text(zf, "export_info.json", json.dumps(export_info(dataset), indent=2))

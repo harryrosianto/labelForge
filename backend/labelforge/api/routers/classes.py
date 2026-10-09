@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from labelforge.core.visualize import PALETTE
 from labelforge.api.deps import DbSession, Storage, get_class_or_404, get_project_or_404
 from labelforge.models import Annotation, ClassExemplar, LabelClass
 from labelforge.schemas.label_class import ClassCreate, ClassOrder, ClassOut, ClassUpdate
@@ -9,10 +10,6 @@ from labelforge.schemas.label_class import ClassCreate, ClassOrder, ClassOut, Cl
 router = APIRouter(tags=["classes"])
 
 # Palet default untuk class baru (kontras tinggi di atas foto gudang).
-PALETTE = [
-    "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0",
-    "#f032e6", "#bcf60c", "#fabebe", "#008080", "#e6beff", "#9a6324", "#800000",
-]  # fmt: skip
 
 
 def _project_classes(db: Session, project_id: int) -> list[LabelClass]:

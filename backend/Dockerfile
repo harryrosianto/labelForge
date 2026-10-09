@@ -17,7 +17,7 @@ COPY labelforge ./labelforge
 RUN pip install .
 EXPOSE 8000
 # Migrasi DB dijalankan setiap start (idempotent), lalu API.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn labelforge.api.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python -m labelforge.cli migrate && uvicorn labelforge.api.main:app --host 0.0.0.0 --port 8000"]
 
 
 FROM base AS worker

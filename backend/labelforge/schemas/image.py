@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from labelforge.models.enums import ImageStatus
+from labelforge.models.enums import ImageSource, ImageStatus
 
 
 class AnnotationOut(BaseModel):
@@ -28,6 +28,10 @@ class ImageOut(BaseModel):
     width: int
     height: int
     status: str
+    source_type: str = ImageSource.UPLOAD
+    source_id: int | None = None
+    source_label: str | None = None
+    frame_time_s: float | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -69,6 +73,7 @@ class ImageIds(BaseModel):
 
 class ImageFilters(BaseModel):
     status: ImageStatus | None = None
+    source_type: ImageSource | None = None
     class_id: int | None = None
     source: str | None = Field(default=None, description='"manual", "ai" (semua AI), atau tag lengkap')
     max_conf: float | None = Field(default=None, ge=0, le=1,

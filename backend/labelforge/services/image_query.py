@@ -11,6 +11,8 @@ def filtered_images(project_id: int, f: ImageFilters) -> Select:
     query = select(Image).where(Image.project_id == project_id)
     if f.status:
         query = query.where(Image.status == f.status)
+    if f.source_type:
+        query = query.where(Image.source_type == f.source_type)
 
     ann = select(Annotation.id).where(Annotation.image_id == Image.id)
     if f.class_id is not None:

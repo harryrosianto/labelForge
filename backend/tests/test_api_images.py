@@ -123,7 +123,7 @@ def test_delete_images(client, gallery, storage, db):
     assert client.get(f"/api/images/{ids[0]}").status_code == 404
 
     r = client.post(f"/api/projects/{pid}/images/bulk-delete", json={"image_ids": ids[1:3] + [9999]})
-    assert r.json() == {"deleted": 2}
+    assert r.json() == {"deleted": 2, "protected": []}
     assert ids_for(client, pid) == ids[3:]
     db.expire_all()
     assert db.query(Annotation).count() == 1  # anotasi ikut terhapus

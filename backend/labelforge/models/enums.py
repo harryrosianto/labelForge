@@ -22,6 +22,10 @@ class ShapeType(StrEnum):
 
 class JobType(StrEnum):
     AUTOLABEL = "autolabel"
+    IMPORT = "import"
+    VERSION_BUILD = "version_build"
+    VIDEO_EXTRACT = "video_extract"
+    RTSP_CAPTURE = "rtsp_capture"
     TRAIN = "train"  # Fase 3
 
 
@@ -43,6 +47,26 @@ class JobItemStatus(StrEnum):
     PENDING = "pending"
     DONE = "done"
     ERROR = "error"
+
+
+class ImageSource(StrEnum):
+    UPLOAD = "upload"
+    IMPORT = "import"
+    VIDEO = "video"
+    RTSP = "rtsp"
+
+
+class VersionStatus(StrEnum):
+    BUILDING = "building"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class ImportStatus(StrEnum):
+    ANALYZED = "analyzed"
+    IMPORTING = "importing"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 SOURCE_MANUAL = "manual"

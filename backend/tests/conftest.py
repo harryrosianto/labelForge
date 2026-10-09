@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from labelforge.api.main import create_app
 from labelforge.db import get_db, make_engine
 from labelforge.models import Base
-from labelforge.services.jobs import run_autolabel_job
+from labelforge.services.job_runner import run_job
 from labelforge.storage import LocalStorage, get_storage
 from labelforge.worker.queue import get_job_queue
 
@@ -39,17 +39,17 @@ class InlineQueue:
         self.enqueued: list[int] = []
         self.revoked: list[str] = []
 
-    def enqueue_autolabel(self, job_id: int) -> str:
-        self.enqueued.append(job_id)
+    def enqueue(self, job_type: str, job_id: int) -> str:
+        self.enqueued.append((job_type, job_id))
         if self.run:
-            run_autolabel_job(job_id, self.session_factory, self.storage)
+            run_job(job_id, self.session_factory, self.storage)
         return f"task-{job_id}"
 
     def revoke(self, task_id: str) -> None:
         self.revoked.append(task_id)
 
-    def ping_workers(self, timeout: float = 1.0) -> list[str]:
-        return ["inline@test"]
+    def ping_workers(self, timeout: float = 1.0) -> list[dict]:
+        return [{"name": "inline@test", "queues": ["inference", "io"], "state": "ready"}]
 
 
 @pytest.fixture

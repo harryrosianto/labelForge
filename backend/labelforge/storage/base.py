@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import BinaryIO
 
 
 class StorageBackend(ABC):
@@ -9,6 +10,10 @@ class StorageBackend(ABC):
 
     @abstractmethod
     def save_bytes(self, key: str, data: bytes) -> None: ...
+
+    @abstractmethod
+    def save_file(self, key: str, fileobj: BinaryIO) -> int:
+        """Simpan dari file object secara streaming (untuk file besar). Mengembalikan ukuran byte."""
 
     @abstractmethod
     def read_bytes(self, key: str) -> bytes: ...

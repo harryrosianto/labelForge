@@ -128,3 +128,38 @@ def test_default_provider_listed_first(monkeypatch):
     providers = registry.describe_providers()
     assert providers[0]["name"] == "owlv2" and providers[0]["is_default"]
     assert sum(p["is_default"] for p in providers) == 1
+
+
+# --- OWLv2: prompt panjang (regresi: semua gambar gagal karena query > 16 token) ---------
+
+USER_CLASSES = [
+    ClassDef(1, "pallet"),
+    ClassDef(2, "goods", "goods include box, something that's not pallet but should be in the top of pallet"),
+    ClassDef(3, "AMR", "AMR is mobile robot"),
+    ClassDef(4, "person", "detecet person"),
+]
+
+
+def test_owlv2_warns_long_text_prompt():
+    owl = registry.get_provider_class("owlv2")
+    warnings = owl.class_warnings("text", USER_CLASSES)
+    assert len(warnings) == 1 and "goods" in warnings[0] and "dipotong" in warnings[0]
+    assert owl.class_warnings("text", [ClassDef(1, "pallet", "wooden pallet, plastic pallet")]) == []
+
+
+def test_owlv2_text_inputs_handle_long_and_mixed_length_prompts():
+    pytest.importorskip("transformers")
+    torch = pytest.importorskip("torch")
+    from transformers import Owlv2Processor
+
+    from labelforge.config import get_settings
+
+    try:
+        processor = Owlv2Processor.from_pretrained(get_settings().owlv2_model_id, local_files_only=True)
+    except OSError:
+        pytest.skip("processor OWLv2 belum ada di cache HuggingFace")
+    provider = registry.get_provider_class("owlv2")()
+    provider.processor, provider.device, provider.dtype, provider._torch = processor, "cpu", torch.float32, torch
+    inputs, query_class = provider._text_inputs(Image.new("RGB", (64, 48)), USER_CLASSES)
+    assert tuple(inputs["input_ids"].shape) == (5, 16)  # 5 frasa, dipotong/di-pad ke 16 token
+    assert query_class == [1, 2, 2, 3, 4]
