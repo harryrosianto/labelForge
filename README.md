@@ -115,9 +115,35 @@ npm run dev          # http://localhost:5173, /api diteruskan ke :8000
 
 Swagger API: http://localhost:8000/docs
 
-Di Windows, semua langkah menjalankan (Redis, migrasi, API, worker, frontend) cukup satu
-perintah dari root repo: `.\dev.ps1` (PowerShell) atau `dev` (Command Prompt). Matikan dengan
-`.\dev.ps1 -Stop`. Worker Celery tidak reload otomatis: restart setelah kode backend berubah.
+Di Windows, pemasangan pertama cukup `.\setup.ps1` (virtualenv, PyTorch CPU atau `-Gpu`,
+dependency frontend, `.env` beserta `SECRET_KEY`, migrasi DB). Setelah itu semua langkah
+menjalankan (Redis, migrasi, API, worker, frontend) cukup satu perintah dari root repo:
+`.\dev.ps1` (PowerShell) atau `dev` (Command Prompt). Matikan dengan `.\dev.ps1 -Stop`.
+Worker Celery tidak reload otomatis: restart setelah kode backend berubah.
+
+### Pindah ke laptop/PC lain
+
+`git clone` hanya membawa kode. Database, gambar, `.env` (berisi `SECRET_KEY` untuk URL
+kamera), dan catatan `docs/prompts` dibawa lewat backup:
+
+```powershell
+# Laptop lama (boleh sambil LabelForge berjalan); hasilnya satu folder, salin ke disk eksternal
+cd backend
+.venv\Scripts\python -m labelforge.cli backup --output E:\
+#   --include-models   ikutkan cache model AI (~1,5 GB) agar tidak perlu unduh ulang
+#   --include-exports  ikutkan ZIP hasil export (default tidak, bisa dibuat ulang)
+
+# PC baru: pasang Python 3.11+, Node LTS, Docker Desktop, Git, lalu
+git clone https://github.com/harryrosianto/labelForge.git
+cd labelForge
+.\setup.ps1 -Restore "E:\labelforge-backup-20261012-1500"
+.\dev.ps1
+```
+
+Restore menolak menimpa database yang sudah berisi data kecuali dengan `--force` (DB lama
+disimpan dulu di `data/backups`). Bila `.env` sudah ada, isinya dipertahankan dan hanya
+`SECRET_KEY` disamakan dengan kunci dari backup. Simpan folder backup di tempat aman karena
+berisi `SECRET_KEY`.
 
 Test:
 
