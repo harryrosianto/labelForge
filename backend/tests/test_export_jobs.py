@@ -1,10 +1,12 @@
 import io
+import json
 import zipfile
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from labelforge.exporters import job as export_job
+from labelforge.exporters.naming import slug
 from labelforge.models import LabelingJob
 from labelforge.services.job_runner import JobCancelled, JobContext
 from tests.test_exporters import ds  # noqa: F401  (4 gambar 400x200: 2 reviewed, 1 auto, 1 unlabeled)
@@ -12,8 +14,13 @@ from tests.test_versions import create, export
 
 
 def _entries(content: bytes) -> dict[str, bytes]:
+    """Isi ZIP per file; jam export di export_info.json diabaikan (bisa beda detik)."""
     with zipfile.ZipFile(io.BytesIO(content)) as zf:
-        return {n: zf.read(n) for n in zf.namelist()}
+        out = {n: zf.read(n) for n in zf.namelist()}
+    info = json.loads(out["export_info.json"])
+    info.pop("exported_at", None)
+    out["export_info.json"] = json.dumps(info, sort_keys=True).encode()
+    return out
 
 
 def _download(client, job_id: int):
@@ -99,4 +106,4 @@ def test_export_job_cancel_leaves_no_file(client, ds, storage, monkeypatch):  # 
 
 @pytest.mark.parametrize("name,expected", [("Gudang A / Lantai 2", "gudang-a-lantai-2"), ("!!!", "dataset")])
 def test_slug(name, expected):
-    assert export_job._slug(name) == expected
+    assert slug(name) == expected

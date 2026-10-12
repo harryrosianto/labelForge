@@ -88,6 +88,8 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
   const [reviewedOnly, setReviewedOnly] = useState(true)
   const [split, setSplit] = useState({ train: 80, val: 20, test: 0 })
   const [seed, setSeed] = useState(42)
+  const [splitMode, setSplitMode] = useState<'random' | 'segment'>('segment')
+  const [segmentSize, setSegmentSize] = useState(50)
   const [prep, setPrep] = useState<Preprocessing>({ resize: 'none', width: 640, height: 640 })
   const [aug, setAug] = useState<AugmentationConfig>(DEFAULT_AUGMENTATION)
   const augPreview = useAugmentPreview(projectId)
@@ -97,6 +99,8 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
   const settings: VersionSettings = {
     reviewed_only: reviewedOnly,
     split: { train: split.train / 100, val: split.val / 100, test: split.test / 100 },
+    split_mode: splitMode,
+    segment_size: segmentSize,
     seed,
     preprocessing: prep.resize === 'none' ? { resize: 'none' } : prep,
     augmentation: aug,
@@ -151,6 +155,36 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
         </Field>
       </div>
       {!validSplit && <p className="text-xs text-rose-600">Split train harus lebih dari 0.</p>}
+
+      <fieldset className="space-y-1 text-sm">
+        <legend className="mb-1 font-medium text-slate-700">Cara membagi split</legend>
+        <label className="flex items-start gap-2">
+          <input type="radio" className="mt-1 accent-brand-600" checked={splitMode === 'segment'} onChange={() => setSplitMode('segment')} />
+          <span>
+            Per segmen waktu per kamera (disarankan untuk CCTV/video)
+            <span className="block text-xs text-slate-500">
+              Frame berurutan dari sumber yang sama dikelompokkan per blok, dan salinan frame yang sama selalu satu blok. Frame
+              yang hampir identik tidak terpisah ke train dan val, jadi metrik validasi tidak terlihat lebih baik dari
+              kenyataan. Sumber diambil dari video/kamera, atau dari awalan nama file (kamera3_757.jpg → kamera3).
+            </span>
+          </span>
+        </label>
+        {splitMode === 'segment' && (
+          <label className="ml-6 flex items-center gap-2">
+            Ukuran blok
+            <input type="number" min={1} className={`${inputClass} w-24`} value={segmentSize}
+              onChange={(e) => setSegmentSize(Math.max(1, Number(e.target.value)))} />
+            frame
+          </label>
+        )}
+        <label className="flex items-start gap-2">
+          <input type="radio" className="mt-1 accent-brand-600" checked={splitMode === 'random'} onChange={() => setSplitMode('random')} />
+          <span>
+            Acak per gambar
+            <span className="block text-xs text-slate-500">Cocok untuk foto yang saling lepas, bukan frame berurutan.</span>
+          </span>
+        </label>
+      </fieldset>
 
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-medium text-slate-700">Preprocessing</legend>
@@ -209,6 +243,12 @@ function CreateVersionForm({ onCreated, onCancel }: { onCreated: (v: DatasetVers
               {preview.data.empty_images > 0 && ` · ${preview.data.empty_images} tanpa objek`}
               {preview.data.augmented > 0 && ` · +${preview.data.augmented} gambar augmentasi di train`}
             </p>
+            {preview.data.split_groups && (
+              <p className="text-xs text-slate-500">
+                {preview.data.split_groups.frames} frame unik dari {preview.data.split_groups.sources} sumber, dibagi menjadi{' '}
+                {preview.data.split_groups.groups} blok
+              </p>
+            )}
             <ClassTable summary={preview.data} />
           </>
         )}
@@ -298,6 +338,8 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
         <dt className="text-slate-500">Split</dt>
         <dd>
           {Math.round(cfg.split.train * 100)} / {Math.round(cfg.split.val * 100)} / {Math.round(cfg.split.test * 100)} (seed {cfg.seed})
+          {' · '}
+          {cfg.split_mode === 'segment' ? `per segmen ${cfg.segment_size} frame per sumber` : 'acak per gambar'}
         </dd>
         <dt className="text-slate-500">Preprocessing</dt>
         <dd>{describePreprocessing(cfg.preprocessing)}</dd>
@@ -323,6 +365,14 @@ function VersionDetail({ version, onDeleted }: { version: DatasetVersion; onDele
             </Button>
           ))}
           {exporting && <Spinner />}
+          <a
+            href={`/api/versions/${version.id}/colab-notebook`}
+            download
+            className="ml-auto text-sm font-medium text-brand-700 hover:underline"
+            title="Notebook Google Colab untuk training YOLO dari ZIP export YOLO versi ini"
+          >
+            ⬇ Notebook Colab
+          </a>
         </div>
         <ExportJobs jobs={exportJobs} limit={3} />
       </div>

@@ -114,7 +114,8 @@ def build_version(ctx: JobContext) -> dict:
         version = db.get(DatasetVersion, version_id)
         items = [{"image_id": it.image_id, "split": it.split, "variant": it.variant,
                   "annotations": it.annotations} for it in version_items(db, version_id)]  # fmt: skip
-        version.summary = summarize(class_names, items)
+        version.summary = {**summarize(class_names, items),
+                           "split_groups": (version.summary or {}).get("split_groups")}  # fmt: skip
         version.image_count = len(items)
         # Versi hanya siap jika semua file berhasil dibuat.
         version.status = VersionStatus.FAILED if failed else VersionStatus.READY

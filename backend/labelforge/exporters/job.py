@@ -5,7 +5,6 @@ tidak ditampung di memori browser.
 """
 
 import os
-import re
 import tempfile
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -14,6 +13,7 @@ from sqlalchemy import select
 
 from labelforge.exporters.base import ExportOptions, collect_dataset
 from labelforge.exporters.coco import write_coco
+from labelforge.exporters.naming import slug, version_zip_name
 from labelforge.exporters.yolo import write_yolo
 from labelforge.models import DatasetVersion, LabelingJob, Project
 from labelforge.models.enums import JobStatus, JobType, VersionStatus
@@ -24,10 +24,6 @@ from labelforge.versions.export import version_dataset
 WRITERS = {"yolo": write_yolo, "coco": write_coco}
 RETENTION = timedelta(days=7)
 PROGRESS_EVERY = 25  # gambar per update progress (hemat tulis DB)
-
-
-def _slug(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "dataset"
 
 
 def cleanup_old_exports(session_factory, storage: StorageBackend, project_id: int) -> int:
@@ -64,13 +60,13 @@ def run_export(ctx: JobContext) -> dict:
             if version is None or version.status != VersionStatus.READY:
                 raise ValueError("Versi tidak ada atau belum siap")
             dataset = version_dataset(db, version, fmt)
-            name = f"{_slug(dataset.project.name)}-{_slug(version.name)}_{fmt}.zip"
+            name = version_zip_name(dataset.project.name, version.name, fmt)
         else:
             options = ExportOptions(format=fmt, reviewed_only=payload["reviewed_only"],
                                     split=payload["split"], seed=payload["seed"])  # fmt: skip
             dataset = collect_dataset(db, ctx.project_id, options)
             project = db.get(Project, ctx.project_id)
-            name = f"{_slug(project.name)}_{fmt}_{datetime.now():%Y%m%d-%H%M}.zip"
+            name = f"{slug(project.name)}_{fmt}_{datetime.now():%Y%m%d-%H%M}.zip"
     if dataset.num_images == 0:
         raise ValueError("Tidak ada gambar untuk diekspor")
     ctx.set_total(dataset.num_images)
