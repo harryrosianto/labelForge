@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from starlette.background import BackgroundTask
@@ -14,7 +14,8 @@ from starlette.background import BackgroundTask
 from labelforge.api.deps import DbSession, Storage, get_project_or_404
 from labelforge.api.routers.export import WRITERS, enqueue_export
 from labelforge.api.routers.jobs import Queue
-from labelforge.models import DatasetVersion
+from labelforge.exporters.naming import version_zip_name
+from labelforge.models import DatasetVersion, Project
 from labelforge.models.enums import JobStatus, JobType, VersionStatus
 from labelforge.schemas.job import JobOut
 from labelforge.services.job_runner import create_job
@@ -23,12 +24,13 @@ from labelforge.versions.builder import (
     VersionCreate,
     VersionSettings,
     create_version,
-    plan_items,
+    plan,
     planned_augmented,
     summarize,
 )
 from labelforge.versions.preview import AugmentPreviewRequest, preview_augmentation
 from labelforge.versions.export import compare_versions, version_dataset
+from labelforge.versions.notebook import notebook_bytes
 
 router = APIRouter(tags=["versions"])
 
@@ -79,8 +81,9 @@ def list_versions(project_id: int, db: DbSession):
 def preview_version(project_id: int, body: VersionSettings, db: DbSession):
     """Ringkasan isi versi dengan pengaturan ini, tanpa membuat apa pun."""
     get_project_or_404(db, project_id)
-    classes, items = plan_items(db, project_id, body)
+    classes, items, split_info = plan(db, project_id, body)
     summary = summarize([c.name for c in classes], items)
+    summary["split_groups"] = split_info
     summary["augmented"] = planned_augmented(body, summary)
     return summary
 
@@ -187,3 +190,13 @@ def start_version_export_job(version_id: int, body: VersionExport, db: DbSession
         raise HTTPException(409, f"Versi berstatus {version.status}, belum bisa diekspor")
     return enqueue_export(db, queue, version.project_id,
                           {"format": body.format, "version_id": version.id, "version": version.name})  # fmt: skip
+
+
+@router.get("/versions/{version_id}/colab-notebook")
+def download_colab_notebook(version_id: int, db: DbSession):
+    """Notebook Colab (Ultralytics YOLO) untuk training dari ZIP export YOLO versi ini."""
+    version = _get_version(db, version_id)
+    project = db.get(Project, version.project_id)
+    filename = version_zip_name(project.name, version.name, "colab").removesuffix(".zip") + ".ipynb"
+    return Response(notebook_bytes(project, version), media_type="application/x-ipynb+json",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})  # fmt: skip

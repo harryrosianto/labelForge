@@ -6,18 +6,20 @@ kondisi project saat itu. File baru (preprocessing, augmentasi) dibuat oleh job 
 
 from collections import Counter
 from pathlib import PurePosixPath
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import insert, select
+from sqlalchemy import Select, insert, select
 from sqlalchemy.orm import Session
 
 from labelforge.augment.pipeline import AugmentationConfig
-from labelforge.exporters.split import SPLITS, split_ids
+from labelforge.exporters.split import SPLITS, split_groups, split_ids
 from labelforge.models import DatasetVersion, DatasetVersionItem, Image, LabelClass
 from labelforge.models.base import utcnow
 from labelforge.models.enums import ImageStatus, VersionStatus
 from labelforge.services.box_rows import load_images_and_boxes
 from labelforge.storage import project_prefix
+from labelforge.versions.segments import ImageMeta, frame_key, segment_groups
 from labelforge.versions.preprocess import Preprocessing, output_size, transform_box
 
 
@@ -38,6 +40,9 @@ class VersionSettings(BaseModel):
 
     reviewed_only: bool = True
     split: SplitRatio = SplitRatio()
+    # random = acak per gambar; segment = per segmen waktu per sumber (lihat versions.segments)
+    split_mode: Literal["random", "segment"] = "random"
+    segment_size: int = Field(50, ge=1, le=100_000)
     seed: int = 42
     preprocessing: Preprocessing = Preprocessing()
     augmentation: AugmentationConfig = AugmentationConfig()
@@ -62,16 +67,33 @@ def _project_classes(db: Session, project_id: int) -> list[LabelClass]:
     ))  # fmt: skip
 
 
-def plan_items(db: Session, project_id: int, settings: VersionSettings) -> tuple[list[LabelClass], list[dict]]:
-    """Rencana item versi (belum ditulis ke DB): split, ukuran output, dan anotasi tertransformasi."""
+def _assign_splits(
+    db: Session, images_query: Select, ids: list[int], settings: VersionSettings
+) -> tuple[dict[str, list[int]], dict | None]:
+    ratios = settings.split.model_dump()
+    if settings.split_mode == "random":
+        return split_ids(ids, ratios, settings.seed), None
+    metas = [ImageMeta(*row) for row in db.execute(images_query.with_only_columns(
+        Image.id, Image.source_type, Image.source_id, Image.original_filename,
+        Image.frame_time_s, Image.captured_at,
+    ))]  # fmt: skip
+    groups, strata = segment_groups(metas, settings.segment_size)
+    info = {"mode": "segment", "segment_size": settings.segment_size, "groups": len(groups),
+            "sources": len(set(strata)), "frames": len({frame_key(m)[2] for m in metas})}  # fmt: skip
+    return split_groups(groups, strata, ratios, settings.seed), info
+
+
+def plan(db: Session, project_id: int, settings: VersionSettings) -> tuple[list[LabelClass], list[dict], dict | None]:
+    """Seperti `plan_items`, ditambah ringkasan pengelompokan split (None untuk mode acak)."""
     classes = _project_classes(db, project_id)
     index_of = {c.id: i for i, c in enumerate(classes)}
     statuses = [ImageStatus.REVIEWED] + ([] if settings.reviewed_only else [ImageStatus.AUTO_LABELED])
-    images, boxes_of = load_images_and_boxes(
-        db, select(Image).where(Image.project_id == project_id, Image.status.in_(statuses))
-    )
+    images_query = select(Image).where(Image.project_id == project_id, Image.status.in_(statuses))
+    images, boxes_of = load_images_and_boxes(db, images_query)
     size_of = {image_id: (w, h) for image_id, w, h in images}
-    assignment = split_ids(list(size_of), settings.split.model_dump(), settings.seed) if size_of else {}
+    assignment, split_info = (
+        _assign_splits(db, images_query, list(size_of), settings) if size_of else ({}, None)
+    )
     p = settings.preprocessing
 
     items = []
@@ -86,6 +108,12 @@ def plan_items(db: Session, project_id: int, settings: VersionSettings) -> tuple
             w, h = output_size(src_w, src_h, p)
             items.append({"image_id": image_id, "split": split, "variant": 0, "width": w,
                           "height": h, "annotations": boxes})  # fmt: skip
+    return classes, items, split_info
+
+
+def plan_items(db: Session, project_id: int, settings: VersionSettings) -> tuple[list[LabelClass], list[dict]]:
+    """Rencana item versi (belum ditulis ke DB): split, ukuran output, dan anotasi tertransformasi."""
+    classes, items, _ = plan(db, project_id, settings)
     return classes, items
 
 
@@ -117,7 +145,7 @@ def item_key(project_id: int, version_id: int, split: str, image_id: int, varian
 
 def create_version(db: Session, project_id: int, body: VersionCreate) -> tuple[DatasetVersion, bool]:
     """Buat versi + manifest. Mengembalikan (versi, perlu_job_build). Caller yang commit."""
-    classes, items = plan_items(db, project_id, body)
+    classes, items, split_info = plan(db, project_id, body)
     if not items:
         raise ValueError(
             "Belum ada gambar reviewed untuk dibuat versi" if body.reviewed_only
@@ -138,7 +166,7 @@ def create_version(db: Session, project_id: int, body: VersionCreate) -> tuple[D
         },
         status=VersionStatus.BUILDING if needs_files else VersionStatus.READY,
         image_count=len(items),
-        summary=summarize(class_names, items),
+        summary={**summarize(class_names, items), "split_groups": split_info},
     )
     db.add(version)
     db.flush()

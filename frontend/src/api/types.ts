@@ -244,6 +244,8 @@ export interface AugmentationConfig {
 export interface VersionSettings {
   reviewed_only: boolean
   split: { train: number; val: number; test: number }
+  split_mode?: 'random' | 'segment'
+  segment_size?: number
   seed: number
   preprocessing: Preprocessing
   augmentation?: AugmentationConfig
@@ -262,6 +264,7 @@ export interface VersionSummary {
   splits: { train: number; val: number; test: number }
   per_class: { name: string; boxes: number; images: number }[]
   empty_images: number
+  split_groups?: { mode: 'segment'; segment_size: number; groups: number; sources: number; frames: number } | null
 }
 
 export interface DatasetVersion {

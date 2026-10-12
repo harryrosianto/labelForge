@@ -115,9 +115,35 @@ npm run dev          # http://localhost:5173, /api diteruskan ke :8000
 
 Swagger API: http://localhost:8000/docs
 
-Di Windows, semua langkah menjalankan (Redis, migrasi, API, worker, frontend) cukup satu
-perintah dari root repo: `.\dev.ps1` (PowerShell) atau `dev` (Command Prompt). Matikan dengan
-`.\dev.ps1 -Stop`. Worker Celery tidak reload otomatis: restart setelah kode backend berubah.
+Di Windows, pemasangan pertama cukup `.\setup.ps1` (virtualenv, PyTorch CPU atau `-Gpu`,
+dependency frontend, `.env` beserta `SECRET_KEY`, migrasi DB). Setelah itu semua langkah
+menjalankan (Redis, migrasi, API, worker, frontend) cukup satu perintah dari root repo:
+`.\dev.ps1` (PowerShell) atau `dev` (Command Prompt). Matikan dengan `.\dev.ps1 -Stop`.
+Worker Celery tidak reload otomatis: restart setelah kode backend berubah.
+
+### Pindah ke laptop/PC lain
+
+`git clone` hanya membawa kode. Database, gambar, `.env` (berisi `SECRET_KEY` untuk URL
+kamera), dan catatan `docs/prompts` dibawa lewat backup:
+
+```powershell
+# Laptop lama (boleh sambil LabelForge berjalan); hasilnya satu folder, salin ke disk eksternal
+cd backend
+.venv\Scripts\python -m labelforge.cli backup --output E:\
+#   --include-models   ikutkan cache model AI (~1,5 GB) agar tidak perlu unduh ulang
+#   --include-exports  ikutkan ZIP hasil export (default tidak, bisa dibuat ulang)
+
+# PC baru: pasang Python 3.11+, Node LTS, Docker Desktop, Git, lalu
+git clone https://github.com/harryrosianto/labelForge.git
+cd labelForge
+.\setup.ps1 -Restore "E:\labelforge-backup-20261012-1500"
+.\dev.ps1
+```
+
+Restore menolak menimpa database yang sudah berisi data kecuali dengan `--force` (DB lama
+disimpan dulu di `data/backups`). Bila `.env` sudah ada, isinya dipertahankan dan hanya
+`SECRET_KEY` disamakan dengan kunci dari backup. Simpan folder backup di tempat aman karena
+berisi `SECRET_KEY`.
 
 Test:
 
@@ -209,13 +235,24 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 Jangan mengganti kunci setelah kamera ditambahkan; URL lama tidak bisa dibuka lagi.
 
-**Training di Colab (sementara, sebelum Fase 3):** buat versi (resize fit 640, tanpa augmentasi
-karena framework training sudah mengaugmentasi), unduh ZIP YOLO, unggah ke Google Drive, lalu
-di Colab ubah baris `path:` di `data.yaml` menjadi folder hasil unzip.
+### Training di Google Colab
+
+Training dijalankan di Colab (GPU gratis), bukan di LabelForge:
+
+1. Buat versi dengan split **per segmen waktu per kamera**. Frame CCTV yang berdekatan hampir
+   identik; split acak per gambar menaruh frame tetangga (dan salinan frame yang sama) di train
+   dan val sekaligus sehingga mAP validasi terlihat lebih tinggi dari kenyataan. Disarankan
+   resize fit 640 dan tanpa augmentasi (Ultralytics sudah mengaugmentasi saat training).
+2. Di detail versi klik **Export YOLO**, unduh ZIP-nya, lalu unggah ke `MyDrive/labelforge/`.
+3. Klik **Notebook Colab**, buka file `.ipynb` di Colab, lalu jalankan sel dari atas. Notebook
+   sudah berisi nama ZIP, ukuran gambar, training Ultralytics YOLO, evaluasi, dan export ONNX;
+   hasilnya tersimpan di `MyDrive/labelforge/runs/`.
+
+Ultralytics berlisensi AGPL-3.0; periksa ketentuannya bila model dipakai di produk.
 
 ## Menambah provider baru
 
-Contoh: model YOLO hasil training sendiri (Fase 3) atau API lain.
+Contoh: model ONNX hasil training di Colab atau API lain.
 
 1. Buat `backend/labelforge/providers/my_model.py`:
 
@@ -300,5 +337,4 @@ frontend/src/
   api/ components/ lib/
 ```
 
-Schema juga menyediakan tabel `dataset_versions` dan `models` untuk Fase 2 dan 3 (lihat
-[ROADMAP.md](ROADMAP.md)).
+Schema juga menyediakan tabel `models` untuk registry model (lihat [ROADMAP.md](ROADMAP.md)).

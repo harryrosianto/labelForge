@@ -290,6 +290,28 @@ def cmd_migrate(_args) -> int:
     return 0
 
 
+def cmd_backup(args) -> int:
+    from labelforge.cli.transfer import TransferError, backup
+
+    try:
+        backup(Path(args.output), args.include_exports, args.include_models)
+    except TransferError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def cmd_restore(args) -> int:
+    from labelforge.cli.transfer import TransferError, restore
+
+    try:
+        restore(Path(args.input), args.force)
+    except TransferError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    return cmd_migrate(args)  # backup dari versi lama: schema disesuaikan
+
+
 def cmd_providers(_args) -> int:
     for p in describe_providers():
         status = "tersedia" if p["available"] else f"TIDAK tersedia: {p['unavailable_reason']}"
@@ -342,6 +364,18 @@ def main(argv: list[str] | None = None) -> int:
 
     m = sub.add_parser("migrate", help="Upgrade schema DB (backup otomatis jika ada migrasi baru)")
     m.set_defaults(func=cmd_migrate)
+
+    b = sub.add_parser("backup", help="Backup DB, gambar, .env untuk pindah ke laptop/PC lain")
+    b.add_argument("--output", required=True, help="Folder tujuan (mis. disk eksternal)")
+    b.add_argument("--include-exports", action="store_true", help="Ikutkan ZIP hasil export")
+    b.add_argument("--include-models", action="store_true",
+                   help="Ikutkan cache model AI (~1,5 GB) agar tidak perlu unduh ulang")
+    b.set_defaults(func=cmd_backup)
+
+    r = sub.add_parser("restore", help="Pulihkan folder hasil backup di laptop/PC ini")
+    r.add_argument("--input", required=True, help="Folder labelforge-backup-...")
+    r.add_argument("--force", action="store_true", help="Ganti DB yang sudah berisi data")
+    r.set_defaults(func=cmd_restore)
 
     p = sub.add_parser("providers", help="Daftar provider dan parameternya")
     p.set_defaults(func=cmd_providers)
