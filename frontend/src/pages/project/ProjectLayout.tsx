@@ -13,6 +13,7 @@ const tabs = [
   ['gallery', 'Galeri'],
   ['autolabel', 'Auto-label'],
   ['versions', 'Versi'],
+  ['models', 'Model'],
   ['export', 'Export'],
 ] as const
 

@@ -22,6 +22,7 @@ dependencies = [
     "opencv-python-headless>=4.10",  # video/RTSP & augmentasi (Apache 2.0)
     "pyyaml>=6",  # data.yaml saat import YOLO
     "cryptography>=42",  # enkripsi URL kamera RTSP
+    "onnxruntime>=1.18",  # model kustom ONNX (MIT); ringan, tanpa torch
 ]
 
 [project.optional-dependencies]
@@ -33,7 +34,7 @@ ml = [
     "torchvision>=0.19",
     "transformers==5.19.0",
 ]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "onnx>=1.16"]  # onnx: membuat model kecil untuk test
 
 [tool.setuptools.packages.find]
 include = ["labelforge*"]

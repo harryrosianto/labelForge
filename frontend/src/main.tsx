@@ -11,6 +11,7 @@ import { CamerasTab } from './pages/project/CamerasTab'
 import { ClassesTab } from './pages/project/ClassesTab'
 import { ExportTab } from './pages/project/ExportTab'
 import { GalleryTab } from './pages/project/GalleryTab'
+import { ModelsTab } from './pages/project/ModelsTab'
 import { OverviewTab } from './pages/project/OverviewTab'
 import { ProjectLayout } from './pages/project/ProjectLayout'
 import { UploadTab } from './pages/project/UploadTab'
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: 'gallery', element: <GalleryTab /> },
       { path: 'autolabel', element: <AutolabelTab /> },
       { path: 'versions', element: <VersionsTab /> },
+      { path: 'models', element: <ModelsTab /> },
       { path: 'export', element: <ExportTab /> },
     ],
   },

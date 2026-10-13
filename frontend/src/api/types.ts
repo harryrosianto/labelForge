@@ -113,6 +113,7 @@ export interface ProviderInfo {
   available: boolean
   unavailable_reason: string | null
   params: Record<string, ParamSpec[]>
+  custom?: boolean
 }
 
 export interface Job {
@@ -373,4 +374,23 @@ export interface Audit {
   seed: number
   created_at: string
   summary: AuditSummary
+}
+
+export interface MLModelInfo {
+  id: number
+  project_id: number
+  name: string
+  framework: string
+  status: string
+  provider: string
+  dataset_version_id: number | null
+  dataset_version_name: string | null
+  metrics: { map50?: number; map50_95?: number; [k: string]: number | undefined }
+  notes: string | null
+  names: string[]
+  input_size: number[]
+  class_map: Record<string, number | null>
+  size_bytes: number | null
+  annotations: number
+  created_at: string
 }

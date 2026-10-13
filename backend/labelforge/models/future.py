@@ -1,8 +1,8 @@
-"""Tabel untuk Fase 3 (model registry)."""
+"""Registry model deteksi hasil training (mis. ONNX dari notebook Colab)."""
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from labelforge.models.base import Base, utcnow
@@ -21,6 +21,9 @@ class MLModel(Base):
     name: Mapped[str] = mapped_column(String(200))
     framework: Mapped[str] = mapped_column(String(64))
     weights_key: Mapped[str | None] = mapped_column(String(500))
-    metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    metrics: Mapped[dict] = mapped_column(JSON, default=dict)  # mis. {"map50": .., "map50_95": ..}
+    # {"names": [...], "input_size": [h, w], "end2end": bool, "class_map": {"0": class_id | None}}
+    config: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

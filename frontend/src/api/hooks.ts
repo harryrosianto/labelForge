@@ -25,6 +25,7 @@ import type {
   ImagePage,
   ImageFilters,
   JobItem,
+  MLModelInfo,
   LabelClass,
   Project,
   ProjectStats,
@@ -155,8 +156,13 @@ export function useDeleteImages(projectId: number) {
 
 // --- providers & jobs -------------------------------------------------------
 
-export const useProviders = () =>
-  useQuery({ queryKey: ['providers'], queryFn: () => api<ProviderInfo[]>('/providers'), staleTime: 60_000 })
+/** Provider bawaan + model kustom milik project (bila projectId diberikan). */
+export const useProviders = (projectId?: number) =>
+  useQuery({
+    queryKey: ['providers', projectId ?? null],
+    queryFn: () => api<ProviderInfo[]>(`/providers${projectId ? `?project_id=${projectId}` : ''}`),
+    staleTime: 60_000,
+  })
 
 export const useHealth = () =>
   useQuery({ queryKey: ['health'], queryFn: () => api<Health>('/health'), refetchInterval: 15_000 })
@@ -496,5 +502,52 @@ export function useDeleteAudit(projectId: number) {
   return useMutation({
     mutationFn: (auditId: number) => api<void>(`/audits/${auditId}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: auditsKey(projectId) }),
+  })
+}
+
+// --- model kustom (ONNX dari Colab) ---------------------------------------------
+
+const modelsKey = (projectId: number) => [...keys.project(projectId), 'models'] as const
+
+export const useModels = (projectId: number) =>
+  useQuery({ queryKey: modelsKey(projectId), queryFn: () => api<MLModelInfo[]>(`/projects/${projectId}/models`) })
+
+function useInvalidateModels(projectId: number) {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: modelsKey(projectId) })
+    qc.invalidateQueries({ queryKey: ['providers'] })
+  }
+}
+
+export function useUploadModel(projectId: number) {
+  const invalidate = useInvalidateModels(projectId)
+  return useMutation({
+    mutationFn: (form: FormData) => api<MLModelInfo>(`/projects/${projectId}/models`, { method: 'POST', body: form }),
+    onSuccess: invalidate,
+  })
+}
+
+export interface ModelUpdate {
+  name?: string
+  notes?: string | null
+  dataset_version_id?: number | null
+  metrics?: Record<string, number | null>
+  class_map?: Record<string, number | null>
+}
+
+export function useUpdateModel(projectId: number) {
+  const invalidate = useInvalidateModels(projectId)
+  return useMutation({
+    mutationFn: ({ id, ...body }: ModelUpdate & { id: number }) => api<MLModelInfo>(`/models/${id}`, json('PATCH', body)),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteModel(projectId: number) {
+  const invalidate = useInvalidateModels(projectId)
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/models/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
   })
 }
