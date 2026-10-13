@@ -85,6 +85,13 @@ for f in ('results.png', 'confusion_matrix_normalized.png'):
         display(Image(filename=str(p), width=900))
 """
 
+EVALUATE_TEST = """
+# Split test tidak dipakai selama training (val dipakai memilih checkpoint terbaik),
+# jadi angka ini perkiraan paling jujur untuk gambar baru.
+test = best.val(data=str(yaml_path), imgsz=IMGSZ, split='test')
+print(f'TEST mAP50-95: {test.box.map:.3f}   mAP50: {test.box.map50:.3f}')
+"""
+
 EXPORT = """
 onnx_path = best.export(format='onnx', imgsz=IMGSZ)
 print('ONNX tersimpan di', onnx_path)
@@ -139,12 +146,14 @@ bisa dimatikan.
         _code(RESUME),
         _md("## 3. Evaluasi"),
         _code(EVALUATE),
+        *([_code(EVALUATE_TEST)] if splits.get("test") else []),
         _md("## 4. Export ONNX"),
         _code(EXPORT),
         _md(f"""
 Selesai. `best.pt` dan `best.onnx` ada di `MyDrive/labelforge/runs/{run_name}/weights/`.
-Catat mAP di atas pada catatan versi **{version.name}** di LabelForge supaya hasil antar
-versi bisa dibandingkan.
+Unduh `best.onnx`, lalu di LabelForge buka tab **Model** dan upload file itu beserta mAP di
+atas. Model langsung bisa dipakai untuk auto-label dan tercatat berasal dari versi
+**{version.name}**.
 """),
     ]
     return {

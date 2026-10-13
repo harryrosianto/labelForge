@@ -246,13 +246,22 @@ Training dijalankan di Colab (GPU gratis), bukan di LabelForge:
 2. Di detail versi klik **Export YOLO**, unduh ZIP-nya, lalu unggah ke `MyDrive/labelforge/`.
 3. Klik **Notebook Colab**, buka file `.ipynb` di Colab, lalu jalankan sel dari atas. Notebook
    sudah berisi nama ZIP, ukuran gambar, training Ultralytics YOLO, evaluasi, dan export ONNX;
-   hasilnya tersimpan di `MyDrive/labelforge/runs/`.
+   hasilnya tersimpan di `MyDrive/labelforge/runs/`. Bila versi punya split test, notebook juga
+   mengevaluasi split itu (perkiraan paling jujur untuk gambar baru).
+4. Unduh `runs/<nama>/weights/best.onnx`, lalu di tab **Model** upload file itu beserta mAP dan
+   versi asalnya. Class model dipetakan otomatis ke class project dengan nama sama (bisa
+   diubah).
+5. Di tab **Auto-label**, model itu muncul paling atas sebagai pilihan. Model dijalankan dengan
+   `onnxruntime` di CPU (sekitar 100 sampai 150 ms per gambar untuk YOLO11n), dan box hasilnya
+   bersumber `ai:model:<id>` sehingga bisa difilter di galeri dan diaudit.
 
-Ultralytics berlisensi AGPL-3.0; periksa ketentuannya bila model dipakai di produk.
+Ultralytics berlisensi AGPL-3.0; periksa ketentuannya bila model dipakai di produk. Inference
+di LabelForge hanya memakai `onnxruntime` (MIT), tanpa library Ultralytics.
 
 ## Menambah provider baru
 
-Contoh: model ONNX hasil training di Colab atau API lain.
+Model ONNX hasil Colab tidak perlu provider baru (cukup upload di tab Model). Provider baru
+dibutuhkan untuk jenis model atau API lain.
 
 1. Buat `backend/labelforge/providers/my_model.py`:
 
@@ -324,7 +333,7 @@ fp16, threshold default, provider default, URL remote, ukuran thumbnail, batas u
 backend/labelforge/
   api/            FastAPI app & router (projects, classes, images, annotations, jobs, export)
   core/           konversi format bbox, NMS, device, visualisasi
-  providers/      LabelingProvider, registry, OWLv2, Grounding DINO, remote
+  providers/      LabelingProvider, registry, OWLv2, Grounding DINO, remote, model ONNX kustom
   worker/         Celery app & task
   services/       logika bisnis (upload, job, editor, query galeri)
   exporters/      YOLO, COCO, split
@@ -337,4 +346,4 @@ frontend/src/
   api/ components/ lib/
 ```
 
-Schema juga menyediakan tabel `models` untuk registry model (lihat [ROADMAP.md](ROADMAP.md)).
+Tabel `models` menyimpan model ONNX yang di-upload (versi asal, mAP, pemetaan class).

@@ -20,6 +20,7 @@ const MODE_LABELS: Record<string, string> = {
   'grounding_dino:text': 'Grounding DINO (teks)',
   'owlv2:text': 'OWLv2 (teks)',
   'owlv2:image_guided': 'OWLv2 (contoh visual)',
+  detect: 'Model kustom',
 }
 
 type Params = Record<string, number | boolean>
@@ -65,7 +66,7 @@ function ParamInput({ spec, value, onChange }: { spec: ParamSpec; value: number 
   )
 }
 
-function JobRow({ job }: { job: Job }) {
+function JobRow({ job, providerLabel }: { job: Job; providerLabel?: string }) {
   const cancel = useCancelJob(job.project_id)
   const [open, setOpen] = useState(false)
   const { data: errors } = useJobItems(job.id, open && job.failed_count > 0)
@@ -78,7 +79,7 @@ function JobRow({ job }: { job: Job }) {
         <JobStatusBadge status={job.status} />
         <span className="font-medium">#{job.id}</span>
         <span className="text-slate-600">
-          {job.provider} / {MODE_LABELS[job.mode ?? ''] ?? job.mode}
+          {providerLabel ?? job.provider} / {MODE_LABELS[job.mode ?? ''] ?? job.mode}
         </span>
         <span className="text-slate-400">· target {job.target}</span>
         <span className="ml-auto tabular-nums text-slate-600">
@@ -126,13 +127,14 @@ function JobRow({ job }: { job: Job }) {
 export function AutolabelTab() {
   const id = useProjectId()
   const location = useLocation()
-  const preselected = (location.state as { imageIds?: number[] } | null)?.imageIds ?? []
-  const { data: providers } = useProviders()
+  const state = location.state as { imageIds?: number[]; provider?: string } | null
+  const preselected = state?.imageIds ?? []
+  const { data: providers } = useProviders(id)
   const { data: classes } = useClasses(id)
   const { data: jobs } = useJobs(id)
   const start = useStartAutolabel(id)
 
-  const [providerName, setProviderName] = useState<string>()
+  const [providerName, setProviderName] = useState<string | undefined>(state?.provider)
   const [mode, setMode] = useState<string>()
   // Hanya nilai yang diubah user; sisanya default dari ParamSpec provider/mode aktif.
   const [overrides, setOverrides] = useState<Params>({})
@@ -140,7 +142,12 @@ export function AutolabelTab() {
   const [includeReviewed, setIncludeReviewed] = useState(false)
 
   const provider: ProviderInfo | undefined = useMemo(
-    () => providers?.find((p) => p.name === providerName) ?? providers?.find((p) => p.is_default) ?? providers?.[0],
+    () =>
+      providers?.find((p) => p.name === providerName) ??
+      // Model hasil training sendiri biasanya paling akurat untuk project ini: jadikan pilihan awal.
+      providers?.find((p) => p.custom && p.available) ??
+      providers?.find((p) => p.is_default) ??
+      providers?.[0],
     [providers, providerName],
   )
   const activeMode = mode && provider?.modes.includes(mode) ? mode : provider?.default_mode
@@ -258,7 +265,7 @@ export function AutolabelTab() {
         {!autolabelJobs.length && <p className="text-sm text-slate-500">Belum ada job.</p>}
         <ul className="space-y-2">
           {autolabelJobs.map((j) => (
-            <JobRow key={j.id} job={j} />
+            <JobRow key={j.id} job={j} providerLabel={providers?.find((p) => p.name === j.provider)?.label} />
           ))}
         </ul>
       </section>

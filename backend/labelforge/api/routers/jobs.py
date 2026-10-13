@@ -24,8 +24,9 @@ def _get_job(db: DbSession, job_id: int) -> LabelingJob:
 
 
 @router.get("/providers")
-def list_providers():
-    return describe_providers()
+def list_providers(db: DbSession, storage: Storage, project_id: int | None = None):
+    """Provider bawaan; dengan `project_id`, model kustom project itu ikut didaftar."""
+    return describe_providers(db, project_id, storage)
 
 
 @router.post(

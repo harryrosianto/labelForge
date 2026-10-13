@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
-import { useClasses, useDeleteImages, useImages } from '../../api/hooks'
+import { useClasses, useDeleteImages, useImages, useModels } from '../../api/hooks'
 import type { Audit } from '../../api/types'
 import { ImageThumb } from '../../components/ImageThumb'
 import { AuditBanner, AuditPanel, BulkStatusButtons } from '../../components/ReviewTools'
@@ -29,6 +29,7 @@ export function GalleryTab() {
   const page = Number(params.get('page') ?? 1)
   const { data, isLoading, isFetching, error } = useImages(id, filters, page, PAGE_SIZE)
   const { data: classes } = useClasses(id)
+  const { data: models = [] } = useModels(id)
   const remove = useDeleteImages(id)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [auditOpen, setAuditOpen] = useState(false)
@@ -107,7 +108,7 @@ export function GalleryTab() {
           ))}
         </select>
         <select className={`${inputClass} w-auto`} value={filters.source ?? ''} onChange={(e) => setParam('source', e.target.value)}>
-          {SOURCES.map(([v, label]) => (
+          {[...SOURCES, ...models.map((m): [string, string] => [`ai:model:${m.id}`, `Model: ${m.name}`])].map(([v, label]) => (
             <option key={v} value={v}>
               {label}
             </option>

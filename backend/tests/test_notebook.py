@@ -36,3 +36,16 @@ def test_colab_notebook_default_size_and_404(client, ds):  # noqa: F811
     assert "IMGSZ = 640" in "\n".join(_code_cells(nb))
     assert "acak per gambar" in "".join(nb["cells"][0]["source"])
     assert client.get("/api/versions/999/colab-notebook").status_code == 404
+
+
+def test_colab_notebook_test_split_cell(client, ds):  # noqa: F811
+    without = create(client, ds["pid"]).json()
+    nb = client.get(f"/api/versions/{without['id']}/colab-notebook").json()
+    assert "split='test'" not in "\n".join(_code_cells(nb))
+
+    with_test = create(client, ds["pid"], name="v2", reviewed_only=False,
+                       split={"train": 0.5, "val": 0.25, "test": 0.25}).json()  # fmt: skip
+    assert with_test["summary"]["splits"]["test"] > 0
+    nb = client.get(f"/api/versions/{with_test['id']}/colab-notebook").json()
+    assert "split='test'" in "\n".join(_code_cells(nb))
+    assert "tab **Model**" in "".join(nb["cells"][-1]["source"])

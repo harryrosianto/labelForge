@@ -79,7 +79,9 @@ def create_autolabel_job(
     if provider == settings.default_provider and not params.get("mode"):
         params["mode"] = settings.default_mode
     try:
-        provider_cls = get_provider_class(provider)
+        provider_cls = get_provider_class(provider, db, storage)
+        if getattr(provider_cls, "project_id", project_id) != project_id:
+            raise JobRequestError("Model ini milik project lain")
         available, reason = provider_cls.is_available()
         if not available:
             raise JobRequestError(f"Provider '{provider}' tidak tersedia: {reason}")
@@ -143,7 +145,7 @@ def run_autolabel_job(
         db.commit()
 
         try:
-            provider = get_provider(job.provider)
+            provider = get_provider(job.provider, db, storage)
             provider.load()
         except Exception as e:  # konfigurasi/dependency/model gagal → seluruh job gagal
             log.exception("Gagal memuat provider %s", job.provider)
