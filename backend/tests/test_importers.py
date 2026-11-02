@@ -79,9 +79,27 @@ def test_yolo_flat_folder_without_yaml_and_darknet_names(tmp_path):
 
 
 def test_yolo_segmentation_polygon_becomes_bbox():
-    assert parse_line("0 0.1 0.2 0.5 0.2 0.3 0.6") == (0, (0.1, 0.2, 0.5, 0.6))
+    assert parse_line("0 0.1 0.2 0.5 0.2 0.3 0.6") == (0, (0.1, 0.2, 0.5, 0.6), None)
     assert parse_line("0 0.1 0.2") is None
     assert parse_line("x 0.5 0.5 0.1 0.1") is None
+
+
+def test_yolo_confidence_column():
+    assert parse_line("1 0.5 0.5 0.2 0.4 0.37") == (1, (0.4, 0.3, 0.6, 0.7), 0.37)
+    assert parse_line("0 0.1 0.2 0.5 0.2 0.3 0.6 0.9") == (0, (0.1, 0.2, 0.5, 0.6), 0.9)
+    assert parse_line("0 0.5 0.5 0.2 0.4 1.5") is None  # confidence di luar 0..1
+
+
+def test_yolo_predictions_keep_confidence(tmp_path):
+    src = zip_source(tmp_path, {
+        "data.yaml": "names: [person, Helmet]",
+        "images/cam3_1762156712345.jpg": JPG,
+        "labels/cam3_1762156712345.txt": "0 0.5 0.5 0.2 0.4 0.91\n1 0.5 0.3 0.1 0.1 0.42\n",
+    })  # fmt: skip
+    ds = parse_dataset(src)
+    img = ds.images[0]
+    assert [(b.class_name, b.confidence) for b in img.boxes] == [("person", 0.91), ("Helmet", 0.42)]
+    assert ds.problems == []
 
 
 def test_yolo_problems(tmp_path):

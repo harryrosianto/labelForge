@@ -93,6 +93,7 @@ def split_from_path(name: str) -> str | None:
 class ImportBox:
     class_name: str
     box: tuple[float, float, float, float]  # xyxy ternormalisasi
+    confidence: float | None = None  # dari label prediksi model; None untuk label biasa
 
 
 @dataclass
