@@ -20,5 +20,9 @@ backend/out/
 *.db-wal
 *.db-shm
 
+# Perekam edge: konfigurasi berisi password dan wheel offline
+edge/capture/capture.env
+edge/capture/wheels/
+
 # Prompt/spesifikasi kerja per fase (catatan lokal, tidak di-commit)
 docs/prompts/

@@ -322,6 +322,15 @@ REMOTE_INFERENCE_TOKEN=rahasia
 Pilih model **Remote inference server** di halaman Auto-label. Kontrak HTTP-nya
 didokumentasikan di `backend/labelforge/providers/remote_api.py`.
 
+## Perekam dataset di perangkat edge
+
+`edge/capture` (paket `lfcapture`) berjalan di perangkat edge SysGuard Vision di lokasi
+klien. Ia membaca deteksi PPE SysGuard, memilih frame yang berguna (pelanggaran, skor ragu,
+interval, contoh kosong), lalu menyimpan frame mentah beserta prediksinya sebagai folder YOLO
+harian. Folder itu diimport dengan opsi tandai untuk review: box masuk sebagai label AI yang
+belum di-approve beserta confidence-nya. Detail dan cara pasang ada di
+[edge/capture/README.md](edge/capture/README.md).
+
 ## Konfigurasi
 
 Semua opsi ada di [.env.example](.env.example): model id, device (`auto`/`cpu`/`cuda`),
@@ -344,6 +353,7 @@ frontend/src/
   pages/          Projects, tab project, editor
   editor/         canvas react-konva & state editor
   api/ components/ lib/
+edge/capture/     perekam dataset di perangkat edge SysGuard (lfcapture)
 ```
 
 Tabel `models` menyimpan model ONNX yang di-upload (versi asal, mAP, pemetaan class).

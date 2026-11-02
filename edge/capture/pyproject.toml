@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lfcapture"
+version = "0.1.0"
+description = "Perekam dataset di perangkat edge: frame kamera + prediksi PPE SysGuard dalam format YOLO"
+requires-python = ">=3.11"
+# Sengaja minimal: perangkat edge di lokasi klien biasanya tanpa internet, jadi dependency
+# dibawa sebagai wheel offline. HTTP memakai urllib bawaan; gambar disimpan apa adanya.
+dependencies = ["websockets>=14"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+lfcapture = "lfcapture.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["lfcapture*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
