@@ -33,12 +33,12 @@ def test_without_person_class(tmp_path):
 
 
 def test_save_layout_meta_and_unique_names(tmp_path):
-    cfg = make_config(tmp_path / "out", CAPTURE_PREFIX="mdlz")
+    cfg = make_config(tmp_path / "out", CAPTURE_PREFIX="mdlz", CAPTURE_SITE="mondelez-cikarang")
     w = DatasetWriter(cfg)
     d = det(ts=TS - 0.08, tracks=[track(missing=["Helmet"])], items=[item()])
     first = w.save(d, JPEG, TS, "violation", "Line 3")
     second = w.save(d, JPEG, TS, "violation", "Line 3")
-    day = tmp_path / "out" / "mdlz-20251103"
+    day = tmp_path / "out" / "mondelez-cikarang" / "mdlz-20251103"
     assert first.image == day / "images" / "cam3_1762156712345.jpg"
     assert second.image.name == "cam3_1762156712346.jpg"
     assert first.image.read_bytes() == JPEG
@@ -79,7 +79,7 @@ def test_output_imports_into_labelforge(tmp_path):
     w = DatasetWriter(make_config(tmp_path))
     w.save(det(tracks=[track(score=0.91)], items=[item(score=0.42)]), JPEG, TS, "uncertain")
     w.save(det(), JPEG, TS + 10, "empty")
-    ds = importers.parse_dataset(DirSource(tmp_path / "ppe-20251103"))
+    ds = importers.parse_dataset(DirSource(tmp_path / "umum" / "ppe-20251103"))
     assert ds.format == "yolo" and ds.class_names[:2] == ["person", "Helmet"]
     assert ds.problems == []
     boxes = sorted((b.class_name, b.confidence) for i in ds.images for b in i.boxes)
