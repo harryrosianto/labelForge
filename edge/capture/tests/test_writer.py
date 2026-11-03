@@ -84,3 +84,39 @@ def test_output_imports_into_labelforge(tmp_path):
     assert ds.problems == []
     boxes = sorted((b.class_name, b.confidence) for i in ds.images for b in i.boxes)
     assert boxes == [("Helmet", 0.42), ("person", 0.91)]
+
+
+# --- rasio gambar ---------------------------------------------------------------
+def real_jpeg(size):
+    Image = pytest.importorskip("PIL.Image")
+    import io
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, (90, 120, 150)).save(buf, "JPEG")
+    return buf.getvalue()
+
+
+def test_fix_aspect_stretches_width_only():
+    from PIL import Image
+    import io
+
+    from lfcapture.writer import fix_aspect
+
+    out, size = fix_aspect(real_jpeg((640, 480)), (1280, 720))
+    assert size == (853, 480) and Image.open(io.BytesIO(out)).size == (853, 480)
+    same = real_jpeg((1280, 720))
+    assert fix_aspect(same, (16, 9)) == (same, None)  # sudah sesuai: tidak di-encode ulang
+    assert fix_aspect(same, None) == (same, None)
+    assert fix_aspect(JPEG, (16, 9)) == (JPEG, None)  # JPEG rusak: disimpan apa adanya
+
+
+def test_save_records_saved_size_and_keeps_labels(tmp_path):
+    w = DatasetWriter(make_config(tmp_path))
+    d = det(tracks=[track(box=(0.4, 0.2, 0.5, 0.8))])
+    saved = w.save(d, real_jpeg((640, 480)), TS, "interval", "cam", (1280, 720))
+    day = saved.image.parent.parent
+    meta = json.loads((day / "meta" / "20251103.jsonl").read_text())
+    assert meta["frame_size"] == list(d.frame_size)  # ukuran dari pesan deteksi, tidak diubah
+    assert meta["saved_size"] == [853, 480]
+    # koordinat ternormalisasi tidak berubah oleh peregangan per sumbu
+    assert (day / "labels" / f"{saved.image.stem}.txt").read_text().startswith("0 0.45000 0.50000")

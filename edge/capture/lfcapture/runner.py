@@ -22,7 +22,7 @@ from lfcapture.client import (
     SysGuardClient,
     subscribe,
 )
-from lfcapture.config import Config
+from lfcapture.config import Config, parse_aspect
 from lfcapture.select import Detections, Selector
 from lfcapture.writer import DatasetWriter, DiskFull
 
@@ -40,6 +40,7 @@ class Recorder:
         self.selector = Selector(cfg)
         self.clock = clock
         self.names: dict[int, str | None] = {}
+        self.aspects: dict[int, tuple[int, int] | None] = {}
         self.stats: Counter = Counter()
         self.disk_full = False
         self._reauth = False
@@ -75,7 +76,8 @@ class Recorder:
                     self.stats["skip_lag"] += 1  # frame sudah terlalu jauh dari deteksinya
                     return
                 saved = await asyncio.to_thread(self.writer.save, det, jpeg, received, reason,
-                                                self.names.get(det.camera_id))  # fmt: skip
+                                                self.names.get(det.camera_id),
+                                                self.aspects.get(det.camera_id))  # fmt: skip
                 self.stats[f"saved_{reason}"] += 1
                 log.debug("tersimpan %s (%s, %d box)", saved.image.name, reason, saved.boxes)
             except DiskFull as e:
@@ -104,7 +106,15 @@ class Recorder:
         else:
             chosen = [c for c in cams if c["enabled"]]
         self.names = {c["id"]: c["name"] for c in chosen}
+        self.aspects = {c["id"]: self._aspect(c) for c in chosen}
         return sorted(self.names)
+
+    def _aspect(self, cam: dict) -> tuple[int, int] | None:
+        if self.cfg.aspect == "off":
+            return None
+        if self.cfg.aspect == "auto":
+            return parse_aspect(cam.get("resolution") or "")
+        return parse_aspect(self.cfg.aspect)
 
     async def run_once(self, stop: asyncio.Event) -> None:
         ids = await self._prepare()

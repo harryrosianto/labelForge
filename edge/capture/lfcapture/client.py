@@ -109,7 +109,8 @@ class SysGuardClient:
 
     def cameras(self) -> list[dict]:
         cams = self._get_json("/api/cameras")
-        return [{"id": c.get("id"), "name": c.get("name"), "enabled": bool(c.get("enabled"))}
+        return [{"id": c.get("id"), "name": c.get("name"), "enabled": bool(c.get("enabled")),
+                 "resolution": c.get("resolution")}
                 for c in cams if isinstance(c, dict) and isinstance(c.get("id"), int)]  # fmt: skip
 
     def snapshot(self, camera_id: int) -> tuple[bytes, float]:

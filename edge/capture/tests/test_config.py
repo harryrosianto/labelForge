@@ -49,3 +49,15 @@ def test_env_file_and_password_file(tmp_path):
     cfg = load_config(env)
     assert cfg.password == "dari-file" and cfg.classes[-1] == "Safety Vest"
     assert BASE_ENV["SG_URL"] == cfg.sg_url
+
+
+def test_aspect_setting(tmp_path):
+    from lfcapture.config import parse_aspect
+
+    assert make_config(tmp_path).aspect == "auto"
+    assert make_config(tmp_path, CAPTURE_ASPECT="16:9").aspect == "16:9"
+    assert make_config(tmp_path, CAPTURE_ASPECT="OFF").aspect == "off"
+    with pytest.raises(ConfigError, match="CAPTURE_ASPECT"):
+        make_config(tmp_path, CAPTURE_ASPECT="lebar")
+    assert parse_aspect("1280x720") == (1280, 720) and parse_aspect("4:3") == (4, 3)
+    assert parse_aspect("0x720") is None and parse_aspect("") is None

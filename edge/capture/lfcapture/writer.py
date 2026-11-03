@@ -11,7 +11,9 @@ Nama file `cam<id>_<epoch ms>` dipakai LabelForge untuk split per segmen waktu p
 Nama orang hasil pengenalan wajah sengaja tidak disimpan.
 """
 
+import io
 import json
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -20,6 +22,45 @@ from pathlib import Path
 
 from lfcapture.config import Config
 from lfcapture.select import Detections
+
+
+log = logging.getLogger("lfcapture")
+ASPECT_TOLERANCE = 0.02  # selisih rasio di bawah 2% dianggap sudah sesuai
+JPEG_QUALITY = 92
+_pillow_warned = False
+
+
+def fix_aspect(jpeg: bytes, aspect: tuple[int, int] | None) -> tuple[bytes, tuple[int, int] | None]:
+    """Sesuaikan rasio frame ke rasio kamera (tinggi tetap, lebar disesuaikan).
+
+    Kamera bisa mengirim substream 4:3 (mis. 640x480) dari sensor 16:9; tampilan SysGuard
+    meregangkannya kembali, tetapi frame mentah terlihat tergencet. Koordinat YOLO
+    ternormalisasi, jadi label tetap pas setelah gambar diregangkan per sumbu.
+    Hasil: (jpeg, ukuran baru) atau (jpeg asli, None) bila tidak perlu/tidak bisa diubah.
+    """
+    global _pillow_warned
+    if aspect is None:
+        return jpeg, None
+    try:
+        from PIL import Image
+    except ImportError:
+        if not _pillow_warned:
+            log.warning("Pillow tidak terpasang: rasio gambar tidak disesuaikan (CAPTURE_ASPECT)")
+            _pillow_warned = True
+        return jpeg, None
+    try:
+        with Image.open(io.BytesIO(jpeg)) as img:
+            w, h = img.size
+            target_w = round(h * aspect[0] / aspect[1])
+            if abs(target_w - w) / w < ASPECT_TOLERANCE:
+                return jpeg, None
+            out = io.BytesIO()
+            img.convert("RGB").resize((target_w, h), Image.Resampling.LANCZOS).save(
+                out, "JPEG", quality=JPEG_QUALITY)
+    except (OSError, ValueError) as e:  # JPEG rusak: lebih baik simpan apa adanya daripada hilang
+        log.warning("rasio gambar tidak bisa disesuaikan: %s", e)
+        return jpeg, None
+    return out.getvalue(), (target_w, h)
 
 
 class DiskFull(Exception):
@@ -97,8 +138,9 @@ class DatasetWriter:
         return day
 
     def save(self, det: Detections, jpeg: bytes, snap_ts: float, reason: str,
-             camera_name: str | None = None) -> Saved:
+             camera_name: str | None = None, aspect: tuple[int, int] | None = None) -> Saved:
         self.check_disk()
+        jpeg, saved_size = fix_aspect(jpeg, aspect)
         when = datetime.fromtimestamp(snap_ts, UTC)
         day = self.day_dir(when)
         ms = int(snap_ts * 1000)
@@ -118,6 +160,7 @@ class DatasetWriter:
             "snap_ts": round(snap_ts, 3),
             "lag_ms": round((snap_ts - det.ts) * 1000) if det.ts else None,
             "frame_size": list(det.frame_size) if det.frame_size else None,
+            "saved_size": list(saved_size) if saved_size else None,  # None = ukuran asli
             "tracks": [{"id": t.get("id"), "box": t["box"], "score": t.get("score"),
                         "ppe_missing": t.get("ppe_missing") or [], "safety": t.get("safety") or []}
                        for t in det.tracks],  # fmt: skip

@@ -156,3 +156,42 @@ def test_cli_rejects_bad_site_and_reads_env_files(tmp_path, capsys, monkeypatch)
     assert main(["site"]) == 0
     assert capsys.readouterr().out.strip() == "pabrik-dua"
     assert main(["reset", "../etc", "--konfirmasi", "../etc"]) == 2
+
+
+# --- vpn ------------------------------------------------------------------------
+class FakeTailscale:
+    def __init__(self, state="Running", up_rc=0):
+        self.state, self.up_rc, self.calls = state, up_rc, []
+
+    def __call__(self, *args):
+        self.calls.append(args)
+        if args[0] == "up":
+            return subprocess.CompletedProcess(args, self.up_rc, "", "" if self.up_rc == 0 else "invalid key")
+        st = {"BackendState": self.state, "CurrentTailnet": {"Name": "syspex.example"},
+              "Self": {"HostName": "sysedge-b01d", "TailscaleIPs": ["100.64.0.7"],
+                       "KeyExpiry": "2027-05-02T03:50:00Z"},
+              "Peer": {"a": {"Online": True}, "b": {"Online": False}}}  # fmt: skip
+        return subprocess.CompletedProcess(args, 0, json.dumps(st), "")
+
+
+def test_vpn_status(capsys):
+    assert admin.cmd_vpn_status(FakeTailscale(), FakeSystemctl()) == 0
+    out = capsys.readouterr().out
+    assert "sysedge-b01d  100.64.0.7" in out and "1 online dari 2" in out and "kedaluwarsa" in out
+    assert admin.cmd_vpn_status(FakeTailscale("NeedsLogin"), FakeSystemctl()) == 1
+    assert "lfc vpn up" in capsys.readouterr().out
+
+
+def test_vpn_up_uses_key_file_and_deletes_it(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("TAILSCALE_HOME", str(tmp_path))
+    ts = FakeTailscale()
+    assert admin.cmd_vpn_up("sysedge-b01d", "tag:edge", ts, FakeSystemctl()) == 1  # belum ada kunci
+    key = tmp_path / "authkey"
+    key.write_text("tskey-auth-contoh")
+    assert admin.cmd_vpn_up("sysedge-b01d", "tag:edge", FakeTailscale(up_rc=1), FakeSystemctl()) == 1
+    assert key.exists()  # gagal: kunci tetap ada untuk dicoba lagi
+    assert admin.cmd_vpn_up("sysedge-b01d", "tag:edge", ts, FakeSystemctl()) == 0
+    assert not key.exists()
+    up = next(c for c in ts.calls if c[0] == "up")
+    assert f"--auth-key=file:{key}" in up and "--advertise-tags=tag:edge" in up
+    assert "tskey" not in capsys.readouterr().out  # isi kunci tidak pernah dicetak
