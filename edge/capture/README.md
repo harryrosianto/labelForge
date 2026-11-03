@@ -89,6 +89,37 @@ file `chmod 600` (`SG_PASSWORD_FILE`) tanpa diketik di riwayat shell:
 umask 077; read -rsp "Password: " P; printf '%s' "$P" > ~/lfcapture/password; unset P; echo
 ```
 
+### Sebagai service (jalan saat boot)
+
+`/etc` di perangkat SysGuard adalah image read-only yang diganti saat update OS, jadi perekam
+dipasang sebagai service milik user di `~/.config/systemd/user` (di `/home`, persisten):
+
+```bash
+sudo loginctl enable-linger sysedge     # sekali; ulangi setelah update OS (slot berganti)
+cd ~/lfcapture/src && sh deploy/install-service.sh
+```
+
+Skrip menjalankan `check` dulu, lalu memasang, mengaktifkan, dan me-restart service. Service
+berprioritas rendah (`Nice=10`, I/O idle) dan restart sendiri bila mati. Pemantauan:
+
+```bash
+systemctl --user status lfcapture
+cat ~/dataset/status.json                    # jumlah tersimpan/dilewati, disk, terhubung
+sudo journalctl _SYSTEMD_USER_UNIT=lfcapture.service -n 50   # log (butuh sudo)
+systemctl --user stop lfcapture              # berhenti sementara
+```
+
+### Menarik dataset ke laptop
+
+```powershell
+.\edge\capture\deploy\tarik-dataset.ps1 -Device sysedge@<ip> -Tujuan D:\dataset-mondelez
+```
+
+Folder harian disalin lalu di-ZIP, siap diimport. Folder yang sudah ditarik dilewati kecuali
+folder hari ini. Data di perangkat tidak dihapus; kosongkan manual setelah ZIP diperiksa.
+
+### Perintah CLI
+
 `check` mencoba login, mendaftar kamera, mengambil satu snapshot per kamera, dan memeriksa
 disk. `run` merekam sampai dihentikan (Ctrl+C atau SIGTERM). Koneksi putus, SysGuard restart,
 atau sesi berakhir ditangani dengan login dan sambung ulang otomatis. Saat batas disk tercapai

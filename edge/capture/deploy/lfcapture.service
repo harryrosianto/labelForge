@@ -1,0 +1,25 @@
+# Service systemd milik user (bukan sistem): /etc di perangkat SysGuard adalah image read-only
+# yang diganti saat update OS, sedangkan /home persisten. Dipasang oleh install-service.sh ke
+# ~/.config/systemd/user/. Agar jalan saat boot tanpa ada yang login, user butuh linger:
+#   sudo loginctl enable-linger sysedge     (sekali; ulangi setelah update OS pindah slot)
+[Unit]
+Description=Perekam dataset LabelForge (lfcapture) dari deteksi SysGuard
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/lfcapture
+Environment=PYTHONPATH=%h/lfcapture/src
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/lfcapture/venv/bin/python -m lfcapture run --env-file %h/lfcapture/capture.env
+# Perekam sudah login & sambung ulang sendiri; restart ini untuk crash atau konfigurasi diperbaiki.
+Restart=always
+RestartSec=15
+# Prioritas rendah: deteksi SysGuard selalu didahulukan.
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target
