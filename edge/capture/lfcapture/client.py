@@ -62,6 +62,10 @@ class SysGuardClient:
         if body is not None:
             data = json.dumps(body).encode()
             headers["Content-Type"] = "application/json"
+        if method != "GET":
+            # SysGuard menolak POST/PUT/DELETE ke /api bila Origin tidak sama dengan Host.
+            parts = urlsplit(self.base)
+            headers["Origin"] = f"{parts.scheme}://{parts.netloc}"
         if self.session:
             headers["Cookie"] = f"{COOKIE}={self.session}"
         req = urllib.request.Request(self.base + path, data=data, method=method, headers=headers)
@@ -74,14 +78,16 @@ class SysGuardClient:
     def login(self) -> None:
         status, headers, raw = self._request(
             "POST", "/api/auth/login", {"username": self.cfg.username, "password": self.cfg.password})
-        if status in (400, 401, 403):
-            raise AuthError(f"login ditolak (HTTP {status}); periksa SG_USERNAME/SG_PASSWORD")
-        if status != 200:
-            raise ApiError(f"login gagal (HTTP {status})")
         try:
             body = json.loads(raw or b"{}")
         except ValueError:
             body = {}
+        detail = body.get("detail") if isinstance(body, dict) else None
+        reason = f": {detail}" if isinstance(detail, str) else ""
+        if status in (400, 401, 403, 409):  # 409: password awal gateway harus diganti dulu
+            raise AuthError(f"login ditolak (HTTP {status}){reason}")
+        if status != 200:
+            raise ApiError(f"login gagal (HTTP {status}){reason}")
         if body.get("next") == "totp":
             raise AuthError("akun memakai TOTP; buat akun khusus perekam tanpa TOTP")
         cookie = SimpleCookie()

@@ -51,6 +51,9 @@ class FakeSysGuard:
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                # seperti OriginGuard SysGuard: POST tanpa Origin yang sama dengan Host ditolak
+                if self.headers.get("Origin") != f"http://{self.headers.get('Host')}":
+                    return self._send(403, b'{"detail":"cross-origin request refused"}')
                 if self.path != "/api/auth/login" or body != {"username": "perekam", "password": "rahasia-uji"}:
                     return self._send(401, b'{"detail":"Wrong username or password"}')
                 fake.logins += 1

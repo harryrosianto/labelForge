@@ -65,13 +65,28 @@ pip download websockets --only-binary=:all: --platform manylinux2014_aarch64 \
 ```
 
 ```bash
-# di perangkat
-python3 -m venv ~/lfcapture/venv
-~/lfcapture/venv/bin/pip install --no-index --find-links ~/lfcapture/wheels websockets
-~/lfcapture/venv/bin/pip install --no-deps ~/lfcapture/src   # folder edge/capture ini
-cp capture.env.example ~/lfcapture/capture.env && chmod 600 ~/lfcapture/capture.env
-~/lfcapture/venv/bin/python -m lfcapture check --env-file ~/lfcapture/capture.env
-~/lfcapture/venv/bin/python -m lfcapture run --env-file ~/lfcapture/capture.env
+# di laptop, dari root repo: salin kode dan wheel ke perangkat
+git archive --format=tar HEAD edge/capture | ssh sysedge@<ip> \
+    'mkdir -p ~/lfcapture/src ~/lfcapture/wheels && tar -x -C ~/lfcapture/src --strip-components=2'
+scp edge/capture/wheels/*.whl sysedge@<ip>:lfcapture/wheels/
+```
+
+```bash
+# di perangkat. Paket tidak di-pip-install (build offline butuh setuptools); cukup PYTHONPATH.
+cd ~/lfcapture
+python3 -m venv venv
+venv/bin/pip install --no-index --find-links wheels websockets
+umask 077; cp src/capture.env.example capture.env    # lalu isi SG_USERNAME, password, dst.
+PYTHONPATH=src venv/bin/python -m lfcapture check --env-file capture.env
+PYTHONPATH=src venv/bin/python -m lfcapture run --env-file capture.env
+```
+
+Akun SysGuard dibuat di Edge Gateway (`https://<ip>/system`, kartu Users) dengan role viewer
+dan tanpa TOTP. Password pabrik gateway ditolak SysGuard; pakai password sendiri, disimpan di
+file `chmod 600` (`SG_PASSWORD_FILE`) tanpa diketik di riwayat shell:
+
+```bash
+umask 077; read -rsp "Password: " P; printf '%s' "$P" > ~/lfcapture/password; unset P; echo
 ```
 
 `check` mencoba login, mendaftar kamera, mengambil satu snapshot per kamera, dan memeriksa
