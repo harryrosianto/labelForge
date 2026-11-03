@@ -1,0 +1,18 @@
+# Akses jarak jauh lewat Tailscale, sebagai service milik user (bukan root): /etc perangkat
+# read-only dan user tidak boleh membuat antarmuka jaringan, jadi tailscaled berjalan dalam mode
+# userspace. Koneksi hanya keluar dari perangkat (tidak ada port dibuka di jaringan klien);
+# SSH yang masuk lewat Tailscale diteruskan ke sshd lokal. Dipasang oleh install-tailscale.sh.
+[Unit]
+Description=Tailscale (userspace) untuk akses jarak jauh perangkat edge
+After=default.target
+
+[Service]
+Type=notify
+ExecStart=%h/tailscale/bin/tailscaled --tun=userspace-networking --statedir=%h/tailscale/state --socket=%h/tailscale/tailscaled.sock --port=41641 --no-logs-no-support
+Restart=always
+RestartSec=10
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=default.target

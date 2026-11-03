@@ -290,6 +290,77 @@ def cmd_reset(p: Paths, site: str, given: str | None, run: Systemctl = systemctl
     return 0
 
 
+# --- akses jarak jauh (Tailscale userspace, lihat deploy/install-tailscale.sh) -----------------
+def tailscale_home() -> Path:
+    return Path(os.environ.get("TAILSCALE_HOME") or Path.home() / "tailscale")
+
+
+def _tailscale(*args: str) -> subprocess.CompletedProcess:
+    ts = tailscale_home()
+    return subprocess.run([str(ts / "bin" / "tailscale"), f"--socket={ts / 'tailscaled.sock'}", *args],
+                          capture_output=True, text=True, timeout=60)  # fmt: skip
+
+
+def _too_open(path: Path) -> bool:
+    return os.name != "nt" and bool(path.stat().st_mode & 0o077)
+
+
+def cmd_vpn_status(run_ts: Callable[..., subprocess.CompletedProcess] = _tailscale,
+                   run: Systemctl = systemctl) -> int:
+    try:
+        svc = run("is-active", "tailscaled.service").stdout.strip() or "?"
+    except OSError:
+        svc = "?"
+    print(f"tailscaled: {svc}")
+    try:
+        r = run_ts("status", "--json")
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"tailscale tidak bisa dijalankan: {e}")
+        return 1
+    if r.returncode != 0 or not r.stdout.strip().startswith("{"):
+        print((r.stdout + r.stderr).strip() or "status tidak tersedia")
+        return 1
+    st = json.loads(r.stdout)
+    me = st.get("Self") or {}
+    print(f"status    : {st.get('BackendState')}")
+    if st.get("BackendState") == "NeedsLogin":
+        print("belum terdaftar: simpan auth key di ~/tailscale/authkey lalu jalankan: lfc vpn up")
+        return 1
+    ips = ", ".join(me.get("TailscaleIPs") or [])
+    print(f"perangkat : {me.get('HostName')}  {ips}")
+    print(f"tailnet   : {(st.get('CurrentTailnet') or {}).get('Name', '?')}")
+    peers = (st.get("Peer") or {}).values()
+    online = [p for p in peers if p.get("Online")]
+    print(f"peer      : {len(online)} online dari {len(list((st.get('Peer') or {}).values()))}")
+    if me.get("KeyExpiry"):
+        print(f"kunci kedaluwarsa: {me['KeyExpiry']}  (matikan expiry perangkat ini di konsol admin)")
+    return 0 if st.get("BackendState") == "Running" else 1
+
+
+def cmd_vpn_up(hostname: str, tags: str | None,
+               run_ts: Callable[..., subprocess.CompletedProcess] = _tailscale,
+               run: Systemctl = systemctl) -> int:
+    """Daftarkan perangkat memakai auth key di ~/tailscale/authkey, lalu hapus file kuncinya."""
+    key = tailscale_home() / "authkey"
+    if not key.exists():
+        print(f"belum ada {key}. Simpan auth key dari konsol admin Tailscale ke file itu "
+              "(chmod 600), lalu jalankan lagi.")  # fmt: skip
+        return 1
+    if _too_open(key):
+        print(f"{key} harus chmod 600")
+        return 1
+    args = ["up", f"--auth-key=file:{key}", f"--hostname={hostname}"]
+    if tags:
+        args.append(f"--advertise-tags={tags}")
+    r = run_ts(*args)
+    print((r.stdout + r.stderr).strip())
+    if r.returncode != 0:
+        return 1
+    key.unlink()  # kunci hanya untuk pendaftaran; jangan tertinggal di perangkat
+    print("terdaftar; file auth key dihapus")
+    return cmd_vpn_status(run_ts, run)
+
+
 def cmd_log(p: Paths, lines: int, follow: bool) -> int:
     if not p.log_file.exists():
         print(f"belum ada log di {p.log_file}")

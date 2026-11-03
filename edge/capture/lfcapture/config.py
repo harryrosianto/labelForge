@@ -27,6 +27,14 @@ def check_site(name: str) -> str:
     return name
 
 
+def parse_aspect(value: str) -> tuple[int, int] | None:
+    """'1280x720' / '16:9' -> (1280, 720) / (16, 9); None bila tidak valid."""
+    m = re.fullmatch(r"\s*(\d{1,5})\s*[x:]\s*(\d{1,5})\s*", value or "")
+    if not m or not int(m[1]) or not int(m[2]):
+        return None
+    return int(m[1]), int(m[2])
+
+
 def lfcapture_home(env: Mapping[str, str] | None = None) -> Path:
     e = os.environ if env is None else env
     return Path(e.get(HOME_ENV) or Path.home() / "lfcapture")
@@ -51,6 +59,9 @@ class Config:
     person_class: str | None = "person"  # box orang dari tracks; None = tidak disimpan
     ca_file: str | None = None
     insecure_tls: bool = False
+    # Rasio gambar yang disimpan: "auto" = ikut resolusi kamera di SysGuard (yang juga dipakai
+    # tampilan live), "off" = frame apa adanya, atau rasio tetap seperti "16:9".
+    aspect: str = "auto"
     # Aturan pemilihan frame (detik / skor)
     interval_s: float = 10.0
     uncertain_low: float = 0.25
@@ -136,11 +147,14 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         raise ConfigError(f"CAPTURE_PERSON_CLASS {person!r} tidak ada di CAPTURE_CLASSES")
     prefix = e.get("CAPTURE_PREFIX", "ppe").strip() or "ppe"
     site = check_site(e.get("CAPTURE_SITE", "").strip() or DEFAULT_SITE)
+    aspect = e.get("CAPTURE_ASPECT", "auto").strip().lower() or "auto"
+    if aspect not in ("auto", "off") and parse_aspect(aspect) is None:
+        raise ConfigError("CAPTURE_ASPECT harus auto, off, atau rasio seperti 16:9")
     cfg = Config(
         sg_url=url, username=username, password=password, out_dir=Path(out_dir) / site,
         root_dir=Path(out_dir), site=site, prefix=prefix,
         camera_ids=cameras, classes=classes, person_class=person, ca_file=ca_file,
-        insecure_tls=insecure,
+        insecure_tls=insecure, aspect=aspect,
         interval_s=num("CAPTURE_INTERVAL_S", 10.0),
         uncertain_low=num("CAPTURE_UNCERTAIN_LOW", 0.25),
         uncertain_high=num("CAPTURE_UNCERTAIN_HIGH", 0.6),

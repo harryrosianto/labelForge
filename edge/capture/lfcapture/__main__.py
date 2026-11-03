@@ -10,6 +10,7 @@ Pemakaian di perangkat (lewat SSH), dengan pembungkus `lfc`:
   lfc clean <site> --older-than N    hapus folder harian lama (sudah ditarik ke laptop)
   lfc reset <site>               hapus seluruh data satu site
   lfc check                      uji login, kamera, snapshot, dan disk
+  lfc vpn [up]                   status akses jarak jauh / daftarkan perangkat ke Tailscale
   lfc run                        jalan di foreground (dipakai service)
 
 File env dibaca dari $LFCAPTURE_HOME (default ~/lfcapture): capture.env lalu site.env,
@@ -21,6 +22,7 @@ import asyncio
 import logging
 import os
 import signal
+import socket
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -115,6 +117,10 @@ def build_parser() -> argparse.ArgumentParser:
     clean.add_argument("site")
     clean.add_argument("--older-than", type=int, required=True, metavar="HARI")
     clean.add_argument("--konfirmasi", help="isi 'hapus' untuk tanpa tanya (mis. dari skrip)")
+    vpn = sub.add_parser("vpn", help="status / daftar akses jarak jauh (Tailscale)")
+    vpn.add_argument("aksi", nargs="?", choices=["status", "up"], default="status")
+    vpn.add_argument("--hostname", default=socket.gethostname())
+    vpn.add_argument("--tags", help="mis. tag:edge (harus diizinkan di ACL tailnet)")
     reset = sub.add_parser("reset", help="hapus seluruh data satu site")
     reset.add_argument("site")
     reset.add_argument("--konfirmasi", help="isi nama site untuk tanpa tanya (mis. dari skrip)")
@@ -168,6 +174,10 @@ def _dispatch(args, cfg, paths) -> int:
             return admin.cmd_clean(paths, args.site, args.older_than, args.konfirmasi)
         case "reset":
             return admin.cmd_reset(paths, args.site, args.konfirmasi)
+        case "vpn":
+            if args.aksi == "up":
+                return admin.cmd_vpn_up(args.hostname, args.tags)
+            return admin.cmd_vpn_status()
     return 2
 
 

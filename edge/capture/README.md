@@ -117,6 +117,7 @@ lfc log [-f] [-n 50]           log perekam (file berotasi, maks ~3 MB, tanpa sud
 lfc clean <site> --older-than 7   hapus folder harian lebih tua dari 7 hari (bukan hari ini)
 lfc reset <site>               hapus seluruh data satu site
 lfc check                      uji login, kamera, snapshot, disk
+lfc vpn [up]                   status akses jarak jauh / daftarkan perangkat ke Tailscale
 ```
 
 - Nama site: huruf kecil, angka, dan `-`. Site aktif disimpan di `~/lfcapture/site.env`.
@@ -127,6 +128,35 @@ lfc check                      uji login, kamera, snapshot, disk
   tidak terpengaruh, dan perekaman lanjut sendiri setelah ruang dikosongkan.
 - Sesi SSH biasa sudah punya `lfc` di PATH. Untuk perintah satu baris dari laptop pakai path
   lengkap: `ssh sysedge@<ip> .local/bin/lfc status`.
+
+### Akses jarak jauh (Tailscale)
+
+Perangkat di jaringan klien diakses lewat Tailscale yang berjalan sebagai service user dalam mode
+userspace (tanpa root, tanpa antarmuka jaringan baru). Koneksi hanya keluar dari perangkat, jadi
+tidak ada port yang dibuka di jaringan klien; SSH yang masuk lewat Tailscale diteruskan ke sshd
+lokal. Pasang sebelum perangkat dibawa ke lokasi, dan minta persetujuan IT klien.
+
+1. Di laptop: unduh paket resmi arm64 dari `https://pkgs.tailscale.com/stable/`
+   (`tailscale_<versi>_arm64.tgz` dan `.sha256`-nya), cocokkan checksum, lalu salin
+   `tailscale` dan `tailscaled` ke `~/tailscale/bin/` di perangkat (`chmod 755`).
+2. Di perangkat: `cd ~/lfcapture/src && sh deploy/install-tailscale.sh`
+3. Di konsol admin Tailscale (tailnet perusahaan): buat auth key sekali pakai. Bila memakai tag,
+   izinkan dulu di ACL (`tagOwners`) dan batasi akses tag itu ke port 22 untuk engineer saja.
+4. Di perangkat, simpan kunci tanpa tercetak di layar atau riwayat, lalu daftarkan:
+
+   ```bash
+   umask 077; read -rsp "Auth key: " K; printf '%s' "$K" > ~/tailscale/authkey; unset K; echo
+   lfc vpn up --tags tag:edge      # tanpa --tags bila ACL belum disiapkan
+   ```
+
+   File kunci dihapus otomatis setelah berhasil.
+5. Di konsol admin: matikan *key expiry* untuk perangkat ini, kalau tidak koneksi putus sendiri
+   setelah masa berlaku kunci habis.
+
+`lfc vpn` menampilkan status, IP Tailscale (100.x.x.x), dan tailnet. Dari laptop yang ikut
+tailnet yang sama: `ssh sysedge@<ip-tailscale> .local/bin/lfc status`, dan skrip tarik dengan
+`-Device sysedge@<ip-tailscale>`. Setelah update OS yang berpindah slot, jalankan ulang
+`sudo loginctl enable-linger sysedge` agar kedua service kembali jalan saat boot.
 
 ### Menarik dataset ke laptop
 

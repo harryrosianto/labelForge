@@ -26,7 +26,7 @@ $sshOpt = @("-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-o", "ServerAlive
 if ($Site) {
     $sites = @($Site)
 } else {
-    $sites = ssh @sshOpt $Device "cd $Sumber && for d in */; do echo `${d%/}; done"
+    $sites = ssh @sshOpt $Device "find $Sumber -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort"
     if ($LASTEXITCODE -ne 0 -or -not $sites) { throw "Tidak ada site di ${Device}:$Sumber" }
 }
 $hariIni = (Get-Date).ToUniversalTime().ToString("yyyyMMdd")   # nama folder memakai UTC
