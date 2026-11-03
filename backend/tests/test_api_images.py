@@ -99,6 +99,17 @@ def test_gallery_pagination_and_annotations(client, gallery):
     r = client.get(f"/api/projects/{gallery['pid']}/images", params={"page": 2, "page_size": 2}).json()
     assert r["total"] == 5 and [i["id"] for i in r["items"]] == gallery["ids"][2:4]
     assert r["items"][0]["annotations"][0]["source"] == "manual"
+    # hash isi gambar untuk penanda versi URL file/thumbnail di frontend
+    assert all(len(i["sha256"]) == 64 for i in r["items"])
+    assert len({i["sha256"] for i in r["items"]}) == 2
+
+
+def test_image_reuses_id_but_url_version_changes(client, project):
+    """SQLite memakai ulang id terbesar setelah dihapus; hash di URL yang membedakan isinya."""
+    first = upload(client, project["id"], ("a.jpg", make_jpeg((40, 30), "red"))).json()["uploaded"][0]
+    client.post(f"/api/projects/{project['id']}/images/bulk-delete", json={"image_ids": [first["id"]]})
+    second = upload(client, project["id"], ("b.jpg", make_jpeg((40, 30), "blue"))).json()["uploaded"][0]
+    assert second["id"] == first["id"] and second["sha256"] != first["sha256"]
 
 
 def test_image_detail_neighbours_follow_filter(client, gallery):

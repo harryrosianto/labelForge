@@ -27,6 +27,8 @@ class ImageOut(BaseModel):
     original_filename: str
     width: int
     height: int
+    # Dipakai frontend sebagai penanda versi di URL file/thumbnail (cache browser 1 tahun).
+    sha256: str
     status: str
     source_type: str = ImageSource.UPLOAD
     source_id: int | None = None

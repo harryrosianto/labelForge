@@ -45,5 +45,9 @@ export function queryString(params: object): string {
   return s ? `?${s}` : ''
 }
 
-export const imageFileUrl = (id: number) => `/api/images/${id}/file`
-export const imageThumbUrl = (id: number) => `/api/images/${id}/thumb`
+// Respons file/thumbnail di-cache browser setahun. Id gambar bisa dipakai ulang, jadi URL
+// membawa awal sha256 isi gambar: gambar berbeda selalu punya URL berbeda.
+type ImageRef = { id: number; sha256: string }
+const version = (img: ImageRef) => `?v=${img.sha256.slice(0, 16)}`
+export const imageFileUrl = (img: ImageRef) => `/api/images/${img.id}/file${version(img)}`
+export const imageThumbUrl = (img: ImageRef) => `/api/images/${img.id}/thumb${version(img)}`

@@ -25,7 +25,7 @@ export function ImageThumb({
       <button type="button" className="block w-full" onClick={onOpen} title={image.original_filename}>
         <div className="relative w-full" style={{ aspectRatio: ratio }}>
           <img
-            src={imageThumbUrl(image.id)}
+            src={imageThumbUrl(image)}
             alt={image.original_filename}
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"

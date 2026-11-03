@@ -20,7 +20,9 @@ from labelforge.services.upload import process_uploads
 
 router = APIRouter(tags=["images"])
 Filters = Annotated[ImageFilters, Depends()]
-# Nama file di storage memakai UUID, jadi konten di URL yang sama tidak pernah berubah.
+# URL dari frontend selalu membawa ?v=<awal sha256>. Id gambar bisa dipakai ulang (SQLite
+# setelah gambar terakhir dihapus, atau database lain di browser yang sama), jadi hanya
+# pasangan id + hash yang dijamin isinya tidak berubah.
 IMMUTABLE = {"Cache-Control": "private, max-age=31536000, immutable"}
 
 

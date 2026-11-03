@@ -56,6 +56,7 @@ export interface ImageItem {
   original_filename: string
   width: number
   height: number
+  sha256: string
   status: ImageStatus
   source_type: ImageSource
   source_id: number | null
