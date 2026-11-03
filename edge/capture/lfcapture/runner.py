@@ -177,9 +177,10 @@ class Recorder:
                 self.disk_full = False  # ruang sudah dikosongkan (data dipindah ke laptop)
                 log.info("disk cukup lagi, perekaman dilanjutkan")
             status = {"time": datetime.now(UTC).isoformat(timespec="seconds"),
-                      "connected": self.client.session is not None, "cameras": sorted(self.names),
-                      "disk": disk, "disk_full": self.disk_full, "counts": dict(self.stats)}  # fmt: skip
+                      "connected": self.client.session is not None, "site": self.cfg.site,
+                      "cameras": sorted(self.names), "disk": disk, "disk_full": self.disk_full,
+                      "counts": dict(self.stats)}  # fmt: skip
             log.info("status %s", json.dumps(status["counts"], sort_keys=True))
-            tmp = self.cfg.out_dir / "status.json.tmp"
+            tmp = self.cfg.root_dir / "status.json.tmp"
             tmp.write_text(json.dumps(status, indent=2), encoding="utf-8")
-            tmp.replace(self.cfg.out_dir / "status.json")
+            tmp.replace(self.cfg.root_dir / "status.json")

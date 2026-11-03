@@ -2,16 +2,39 @@
 
 import ipaddress
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
 DEFAULT_CLASSES = ("person", "Helmet", "Mask", "Safety Vest", "boots", "glove")
+DEFAULT_SITE = "umum"
+SITE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+# Folder kerja di perangkat; `lfc` dan service membaca capture.env lalu site.env dari sini.
+HOME_ENV = "LFCAPTURE_HOME"
+ENV_FILES = ("capture.env", "site.env")
 
 
 class ConfigError(ValueError):
     """Konfigurasi tidak lengkap atau tidak valid (pesan aman ditampilkan)."""
+
+
+def check_site(name: str) -> str:
+    if not SITE_RE.match(name):
+        raise ConfigError(f"Nama site {name!r} tidak valid: huruf kecil, angka, dan '-' "
+                          "(maks 40 karakter), diawali huruf/angka")  # fmt: skip
+    return name
+
+
+def lfcapture_home(env: Mapping[str, str] | None = None) -> Path:
+    e = os.environ if env is None else env
+    return Path(e.get(HOME_ENV) or Path.home() / "lfcapture")
+
+
+def default_env_files(env: Mapping[str, str] | None = None) -> list[Path]:
+    home = lfcapture_home(env)
+    return [home / name for name in ENV_FILES if (home / name).exists()]
 
 
 @dataclass(frozen=True)
@@ -19,7 +42,9 @@ class Config:
     sg_url: str
     username: str
     password: str = field(repr=False)
-    out_dir: Path
+    out_dir: Path  # folder site aktif: <root_dir>/<site>
+    root_dir: Path  # CAPTURE_DIR; status.json ada di sini
+    site: str = DEFAULT_SITE
     prefix: str = "ppe"
     camera_ids: tuple[int, ...] = ()  # kosong = semua kamera yang aktif
     classes: tuple[str, ...] = DEFAULT_CLASSES
@@ -110,8 +135,10 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     if person is not None and person not in classes:
         raise ConfigError(f"CAPTURE_PERSON_CLASS {person!r} tidak ada di CAPTURE_CLASSES")
     prefix = e.get("CAPTURE_PREFIX", "ppe").strip() or "ppe"
+    site = check_site(e.get("CAPTURE_SITE", "").strip() or DEFAULT_SITE)
     cfg = Config(
-        sg_url=url, username=username, password=password, out_dir=Path(out_dir), prefix=prefix,
+        sg_url=url, username=username, password=password, out_dir=Path(out_dir) / site,
+        root_dir=Path(out_dir), site=site, prefix=prefix,
         camera_ids=cameras, classes=classes, person_class=person, ca_file=ca_file,
         insecure_tls=insecure,
         interval_s=num("CAPTURE_INTERVAL_S", 10.0),

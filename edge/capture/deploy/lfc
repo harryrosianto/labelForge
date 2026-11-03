@@ -1,0 +1,6 @@
+#!/bin/sh
+# Pembungkus perintah perekam di perangkat. Dipasang ke ~/.local/bin/lfc oleh install-service.sh.
+# Contoh: lfc status | lfc site mondelez-cikarang | lfc log -f   (lihat: lfc --help)
+BASE="${LFCAPTURE_HOME:-$HOME/lfcapture}"
+export LFCAPTURE_HOME="$BASE" PYTHONPATH="$BASE/src"
+exec "$BASE/venv/bin/python" -m lfcapture "$@"

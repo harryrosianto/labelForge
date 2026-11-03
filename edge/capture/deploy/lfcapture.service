@@ -10,8 +10,11 @@ After=default.target
 Type=simple
 WorkingDirectory=%h/lfcapture
 Environment=PYTHONPATH=%h/lfcapture/src
+Environment=LFCAPTURE_HOME=%h/lfcapture
 Environment=PYTHONUNBUFFERED=1
-ExecStart=%h/lfcapture/venv/bin/python -m lfcapture run --env-file %h/lfcapture/capture.env
+# Konfigurasi: capture.env lalu site.env (ditulis `lfc site <nama>`). Log juga ke file supaya
+# bisa dibaca tanpa sudo (`lfc log`).
+ExecStart=%h/lfcapture/venv/bin/python -m lfcapture run --log-file %h/lfcapture/logs/lfcapture.log
 # Perekam sudah login & sambung ulang sendiri; restart ini untuk crash atau konfigurasi diperbaiki.
 Restart=always
 RestartSec=15

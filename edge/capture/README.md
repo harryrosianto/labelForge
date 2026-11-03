@@ -35,12 +35,14 @@ ikut terekam. Class yang tidak dikenal model (mis. hairnet) dilabeli manual di L
 ## Hasil
 
 ```
-ppe-20261103/
-  data.yaml                      names = CAPTURE_CLASSES
-  images/cam3_1762156712345.jpg  JPEG dari SysGuard, tidak di-encode ulang
-  labels/cam3_1762156712345.txt  "cls cx cy w h conf"
-  meta/20261103.jsonl            alasan, track, PPE yang kurang, selisih waktu deteksi ke frame
-status.json                      ringkasan berkala (jumlah tersimpan/dilewati, disk)
+~/dataset/                         CAPTURE_DIR
+  status.json                      ringkasan berkala (site, terhubung, jumlah, disk)
+  mondelez-cikarang/               satu folder per site (lokasi), lihat `lfc site`
+    ppe-20261103/
+      data.yaml                      names = CAPTURE_CLASSES
+      images/cam3_1762156712345.jpg  JPEG dari SysGuard, tidak di-encode ulang
+      labels/cam3_1762156712345.txt  "cls cx cy w h conf"
+      meta/20261103.jsonl            alasan, track, PPE yang kurang, selisih waktu
 ```
 
 - Nama `cam<id>_<epoch ms>` dipakai LabelForge untuk split per segmen waktu per kamera.
@@ -77,8 +79,6 @@ cd ~/lfcapture
 python3 -m venv venv
 venv/bin/pip install --no-index --find-links wheels websockets
 umask 077; cp src/capture.env.example capture.env    # lalu isi SG_USERNAME, password, dst.
-PYTHONPATH=src venv/bin/python -m lfcapture check --env-file capture.env
-PYTHONPATH=src venv/bin/python -m lfcapture run --env-file capture.env
 ```
 
 Akun SysGuard dibuat di Edge Gateway (`https://<ip>/system`, kartu Users) dengan role viewer
@@ -99,32 +99,45 @@ sudo loginctl enable-linger sysedge     # sekali; ulangi setelah update OS (slot
 cd ~/lfcapture/src && sh deploy/install-service.sh
 ```
 
-Skrip menjalankan `check` dulu, lalu memasang, mengaktifkan, dan me-restart service. Service
-berprioritas rendah (`Nice=10`, I/O idle) dan restart sendiri bila mati. Pemantauan:
+Skrip memasang perintah `lfc` ke `~/.local/bin`, menjalankan `lfc check`, lalu memasang,
+mengaktifkan, dan me-restart service. Service berprioritas rendah (`Nice=10`, I/O idle) dan
+restart sendiri bila mati. Koneksi putus, SysGuard restart, atau sesi berakhir ditangani
+perekam dengan login dan sambung ulang otomatis.
 
-```bash
-systemctl --user status lfcapture
-cat ~/dataset/status.json                    # jumlah tersimpan/dilewati, disk, terhubung
-sudo journalctl _SYSTEMD_USER_UNIT=lfcapture.service -n 50   # log (butuh sudo)
-systemctl --user stop lfcapture              # berhenti sementara
+### Perintah `lfc` (lewat SSH)
+
 ```
+lfc status                     perekam, autostart, site, koneksi SysGuard, frame hari ini, disk
+lfc start | stop               mulai / hentikan perekaman
+lfc autostart on | off         ikut jalan saat perangkat menyala
+lfc site                       site aktif
+lfc site mondelez-cikarang     pindah site (perekam di-restart, data masuk folder site itu)
+lfc sites                      daftar site: jumlah hari, frame, ukuran, rentang tanggal
+lfc log [-f] [-n 50]           log perekam (file berotasi, maks ~3 MB, tanpa sudo)
+lfc clean <site> --older-than 7   hapus folder harian lebih tua dari 7 hari (bukan hari ini)
+lfc reset <site>               hapus seluruh data satu site
+lfc check                      uji login, kamera, snapshot, disk
+```
+
+- Nama site: huruf kecil, angka, dan `-`. Site aktif disimpan di `~/lfcapture/site.env`.
+- `clean` dan `reset` menampilkan apa yang akan dihapus lalu meminta konfirmasi (`hapus` atau
+  nama site). Di sesi non-interaktif tambahkan `--konfirmasi <teks>`. `reset` menolak site
+  yang sedang direkam: `lfc stop` atau pindah site dulu.
+- Saat batas disk tercapai perekaman berhenti (`lfc status` menandai PENUH); deteksi SysGuard
+  tidak terpengaruh, dan perekaman lanjut sendiri setelah ruang dikosongkan.
+- Sesi SSH biasa sudah punya `lfc` di PATH. Untuk perintah satu baris dari laptop pakai path
+  lengkap: `ssh sysedge@<ip> .local/bin/lfc status`.
 
 ### Menarik dataset ke laptop
 
 ```powershell
-.\edge\capture\deploy\tarik-dataset.ps1 -Device sysedge@<ip> -Tujuan D:\dataset-mondelez
+.\edge\capture\deploy\tarik-dataset.ps1 -Device sysedge@<ip> -Tujuan D:\dataset-edge [-Site mondelez-cikarang]
 ```
 
-Folder harian disalin lalu di-ZIP, siap diimport. Folder yang sudah ditarik dilewati kecuali
-folder hari ini. Data di perangkat tidak dihapus; kosongkan manual setelah ZIP diperiksa.
-
-### Perintah CLI
-
-`check` mencoba login, mendaftar kamera, mengambil satu snapshot per kamera, dan memeriksa
-disk. `run` merekam sampai dihentikan (Ctrl+C atau SIGTERM). Koneksi putus, SysGuard restart,
-atau sesi berakhir ditangani dengan login dan sambung ulang otomatis. Saat batas disk tercapai
-perekaman berhenti; deteksi SysGuard tidak terpengaruh, dan perekaman lanjut sendiri setelah
-ruang dikosongkan.
+Tiap folder harian dikirim sebagai satu aliran tar lalu di-ZIP per site
+(`<Tujuan>\<site>\<site>-ppe-YYYYMMDD.zip`), siap diimport. Folder yang sudah ditarik dilewati
+kecuali folder hari ini; frame yang sedang ditulis saat ditarik dilewati dan ikut di tarikan
+berikutnya. Data di perangkat tidak dihapus: setelah ZIP diperiksa, `lfc clean`.
 
 ## Test
 
