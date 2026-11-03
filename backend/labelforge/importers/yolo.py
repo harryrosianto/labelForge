@@ -5,6 +5,7 @@ Struktur yang dikenali:
 - folder datar: x.jpg + x.txt di folder yang sama
 Nama class dari data.yaml (`names` list atau dict); tanpa data.yaml → class_0, class_1, ...
 Baris label: "cls cx cy w h" atau polygon YOLO-seg "cls x1 y1 x2 y2 ..." (diubah ke bbox).
+Kolom confidence di akhir baris (format prediksi, jumlah koordinat ganjil) ikut dibaca.
 """
 
 from pathlib import PurePosixPath
@@ -73,7 +74,8 @@ def label_candidates(image_path: str) -> list[str]:
     return out
 
 
-def parse_line(line: str) -> tuple[int, tuple[float, float, float, float]] | None:
+def parse_line(line: str) -> tuple[int, tuple[float, float, float, float], float | None] | None:
+    """(class, box xyxy ternormalisasi, confidence atau None)."""
     values = line.split()
     if len(values) < 5:
         return None
@@ -82,15 +84,20 @@ def parse_line(line: str) -> tuple[int, tuple[float, float, float, float]] | Non
         coords = [float(v) for v in values[1:]]
     except ValueError:
         return None
+    confidence = None
+    if len(coords) % 2 == 1:  # "cls cx cy w h conf" atau polygon + conf (save_conf)
+        confidence = coords.pop()
+        if not 0 <= confidence <= 1:
+            return None
     if len(coords) == 4:
         # Koordinat mentah (tanpa clip) supaya box di luar gambar bisa dilaporkan.
         cx, cy, w, h = coords
         if w < 0 or h < 0:
             return None
-        return cls, (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
-    if len(coords) >= 6 and len(coords) % 2 == 0:  # polygon YOLO-seg
+        return cls, (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), confidence
+    if len(coords) >= 6:  # polygon YOLO-seg
         xs, ys = coords[0::2], coords[1::2]
-        return cls, (min(xs), min(ys), max(xs), max(ys))
+        return cls, (min(xs), min(ys), max(xs), max(ys)), confidence
     return None
 
 
@@ -117,7 +124,7 @@ def parse_yolo(source: Source) -> ParsedDataset:
                 if parsed is None:
                     ds.problem("invalid_line", label_path, f"baris {n}: {raw.strip()[:80]}")
                     continue
-                cls, box = parsed
+                cls, box, confidence = parsed
                 if cls < 0 or (class_names is not None and cls >= len(class_names)):
                     ds.problem("unknown_class", label_path, f"baris {n}: class {cls}")
                     continue
@@ -125,7 +132,7 @@ def parse_yolo(source: Source) -> ParsedDataset:
                 box = clip_box(box, ds, label_path)
                 if box is not None:
                     name = class_names[cls] if class_names is not None else f"class_{cls}"
-                    img.boxes.append(ImportBox(name, box))
+                    img.boxes.append(ImportBox(name, box, confidence))
         ds.images.append(img)
 
     if class_names is None:

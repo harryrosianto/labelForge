@@ -138,6 +138,7 @@ def apply_import(
                 x1, y1, x2, y2 = box.box
                 db.add(Annotation(image_id=image.id, class_id=class_id, x_min=x1, y_min=y1,
                                   x_max=x2, y_max=y2, source=annotation_source,
+                                  confidence=box.confidence,
                                   is_approved=not mark_for_review))  # fmt: skip
                 added += 1
             db.commit()

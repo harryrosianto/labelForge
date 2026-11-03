@@ -101,6 +101,22 @@ def test_mark_for_review_and_duplicates(client, pallet_project, db):
     assert db.query(Image).count() == 2
 
 
+def test_import_predictions_keep_confidence(client, pallet_project):
+    pid, pallet = pallet_project
+    data = make_zip({
+        "data.yaml": "names: [Pallet]",
+        "images/cam3_1762156712345.jpg": make_jpeg((100, 50), "green"),
+        "labels/cam3_1762156712345.txt": "0 0.5 0.5 0.2 0.4 0.42\n",
+    })  # fmt: skip
+    imp = upload(client, pid, data).json()
+    client.post(f"/api/imports/{imp['id']}/start",
+                json={"mapping": {"Pallet": {"action": "map", "class_id": pallet}},
+                      "mark_for_review": True})  # fmt: skip
+    [img] = client.get(f"/api/projects/{pid}/images").json()["items"]
+    [ann] = img["annotations"]
+    assert ann["confidence"] == 0.42 and not ann["is_approved"]
+
+
 def test_start_validation_and_discard(client, pallet_project, storage, db):
     pid, _ = pallet_project
     imp = upload(client, pid, YOLO_ZIP).json()

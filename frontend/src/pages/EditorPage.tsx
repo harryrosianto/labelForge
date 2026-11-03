@@ -61,11 +61,15 @@ function Editor({
   useEffect(() => {
     if (!detail.next_id) return
     const nextId = detail.next_id
+    const key = ['image', nextId, filters]
     qc.prefetchQuery({
-      queryKey: ['image', nextId, filters],
+      queryKey: key,
       queryFn: () => api<ImageDetail>(`/images/${nextId}${qs}`),
+    }).then(() => {
+      // URL file butuh hash gambar, jadi file dimuat setelah detailnya tersedia.
+      const next = qc.getQueryData<ImageDetail>(key)
+      if (next) new window.Image().src = imageFileUrl(next)
     })
-    new window.Image().src = imageFileUrl(nextId)
   }, [detail.next_id, filters, qs, qc])
 
   // Peringatan sebelum menutup tab jika ada perubahan belum tersimpan.
@@ -232,7 +236,7 @@ function Editor({
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 bg-slate-100">
           <AnnotationCanvas
-            imageUrl={imageFileUrl(detail.id)}
+            imageUrl={imageFileUrl(detail)}
             width={detail.width}
             height={detail.height}
             boxes={state.boxes}
