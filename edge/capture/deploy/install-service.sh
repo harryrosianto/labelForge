@@ -18,9 +18,31 @@ mkdir -p "$BIN"
 cp "$BASE/src/deploy/lfc" "$BIN/lfc"
 chmod 755 "$BIN/lfc"
 
+mkdir -p "$UNIT_DIR" "$BASE/logs"
+# Flashdisk (CAPTURE_USB_UUID) dipasang dulu supaya `lfc check` memeriksa disk yang benar.
+if grep -q '^CAPTURE_USB_UUID=..*' "$BASE/capture.env"; then
+    cp "$BASE/src/deploy/lfcapture-usb.service" "$UNIT_DIR/lfcapture-usb.service"
+    systemctl --user daemon-reload
+    systemctl --user enable lfcapture-usb.service
+    "$BIN/lfc" usb pasang --tanpa-start || echo "flashdisk belum terpasang; perekam menunggu (lfc usb pasang)"
+else
+    systemctl --user disable lfcapture-usb.service 2>/dev/null || true
+    rm -f "$UNIT_DIR/lfcapture-usb.service"
+fi
+
+# IP port LAN pengganti alamat recovery firmware, hanya bila lan.env ada (lihat README).
+if [ -f "$BASE/lan.env" ]; then
+    cp "$BASE/src/deploy/lfcapture-lan.service" "$BASE/src/deploy/lfcapture-lan.timer" "$UNIT_DIR/"
+    systemctl --user daemon-reload
+    systemctl --user enable --now lfcapture-lan.timer
+    "$BIN/lfc" lan terapkan || echo "PERHATIAN: IP LAN belum diterapkan (lfc lan)"
+else
+    systemctl --user disable --now lfcapture-lan.timer 2>/dev/null || true
+    rm -f "$UNIT_DIR/lfcapture-lan.service" "$UNIT_DIR/lfcapture-lan.timer"
+fi
+
 "$BIN/lfc" check || { echo "check gagal; service tidak dipasang"; exit 1; }
 
-mkdir -p "$UNIT_DIR" "$BASE/logs"
 cp "$BASE/src/deploy/lfcapture.service" "$UNIT_DIR/lfcapture.service"
 systemctl --user daemon-reload
 systemctl --user enable lfcapture.service

@@ -10,7 +10,10 @@ Pemakaian di perangkat (lewat SSH), dengan pembungkus `lfc`:
   lfc clean <site> --older-than N    hapus folder harian lama (sudah ditarik ke laptop)
   lfc reset <site>               hapus seluruh data satu site
   lfc check                      uji login, kamera, snapshot, dan disk
+  lfc usb [pasang|lepas]         flashdisk penyimpan dataset: status / pasang / lepas aman
   lfc vpn [up]                   status akses jarak jauh / daftarkan perangkat ke Tailscale
+  lfc lan [terapkan]             IP port LAN pengganti alamat recovery 192.168.100.1 (lan.env)
+  lfc inventory | export         dipakai skrip tarik di laptop (deploy/tarik-dataset.ps1)
   lfc run                        jalan di foreground (dipakai service)
 
 File env dibaca dari $LFCAPTURE_HOME (default ~/lfcapture): capture.env lalu site.env,
@@ -64,11 +67,18 @@ def cmd_check(cfg) -> int:
             ok = False
             print(f"  cam{cam['id']:<4} {cam['name']!s:<30} snapshot GAGAL ({e})")
     print(f"site       : {cfg.site} ({cfg.out_dir})")
-    disk = DatasetWriter(cfg).disk_status()
-    print(f"disk       : {disk['used_pct']}% terpakai, sisa {disk['free_mb']} MB")
-    if disk["used_pct"] >= cfg.disk_max_used_pct or disk["free_mb"] < cfg.disk_min_free_mb:
-        ok = False
-        print("             di atas batas, perekam tidak akan menyimpan frame")
+    writer = DatasetWriter(cfg)
+    disk = writer.disk_status()
+    if cfg.usb_uuid:
+        print(f"flashdisk  : {cfg.usb_uuid} {'terpasang' if disk['usb_mounted'] else 'TIDAK terpasang'}")
+    if disk["used_pct"] is not None:
+        print(f"disk       : {disk['used_pct']}% terpakai, sisa {disk['free_mb']} MB")
+    problem = writer.storage_problem()
+    if problem:
+        # Flashdisk yang belum dicolok bukan kegagalan pemasangan: perekam menunggu sampai dipasang.
+        if disk["usb_mounted"]:
+            ok = False
+        print(f"             perekam tidak akan menyimpan frame: {problem}")
     return 0 if ok and targets else 1
 
 
@@ -117,6 +127,15 @@ def build_parser() -> argparse.ArgumentParser:
     clean.add_argument("site")
     clean.add_argument("--older-than", type=int, required=True, metavar="HARI")
     clean.add_argument("--konfirmasi", help="isi 'hapus' untuk tanpa tanya (mis. dari skrip)")
+    sub.add_parser("inventory", help="daftar folder harian (JSON per baris), dipakai skrip tarik")
+    sub.add_parser("export", help="tar frame yang belum dimiliki (permintaan dari stdin) ke stdout")
+    usb = sub.add_parser("usb", help="flashdisk penyimpan dataset: status / pasang / lepas")
+    usb.add_argument("aksi", nargs="?", choices=["status", "pasang", "lepas"], default="status")
+    usb.add_argument("--tanpa-start", action="store_true", help="pasang tanpa memulai perekam")
+    usb.add_argument("--tunggu", type=float, default=0, metavar="DETIK",
+                     help="tunggu flashdisk terdeteksi (dipakai saat boot)")
+    lan = sub.add_parser("lan", help="IP port LAN pengganti alamat recovery (lan.env)")
+    lan.add_argument("aksi", nargs="?", choices=["status", "terapkan"], default="status")
     vpn = sub.add_parser("vpn", help="status / daftar akses jarak jauh (Tailscale)")
     vpn.add_argument("aksi", nargs="?", choices=["status", "up"], default="status")
     vpn.add_argument("--hostname", default=socket.gethostname())
@@ -174,6 +193,24 @@ def _dispatch(args, cfg, paths) -> int:
             return admin.cmd_clean(paths, args.site, args.older_than, args.konfirmasi)
         case "reset":
             return admin.cmd_reset(paths, args.site, args.konfirmasi)
+        case "inventory":
+            return admin.cmd_inventory(paths)
+        case "export":
+            try:
+                return admin.cmd_export(paths, sys.stdin, sys.stdout.buffer)
+            except ValueError as e:
+                print(f"permintaan export ditolak: {e}", file=sys.stderr)
+                return 2
+        case "usb":
+            if args.aksi == "pasang":
+                return admin.cmd_usb_pasang(paths, start=not args.tanpa_start, wait_s=args.tunggu)
+            if args.aksi == "lepas":
+                return admin.cmd_usb_lepas(paths)
+            return admin.cmd_usb_status(paths)
+        case "lan":
+            if args.aksi == "terapkan":
+                return admin.cmd_lan_terapkan(paths.home)
+            return admin.cmd_lan_status(paths.home)
         case "vpn":
             if args.aksi == "up":
                 return admin.cmd_vpn_up(args.hostname, args.tags)

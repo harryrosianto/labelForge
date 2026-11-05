@@ -14,6 +14,8 @@ SITE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 # Folder kerja di perangkat; `lfc` dan service membaca capture.env lalu site.env dari sini.
 HOME_ENV = "LFCAPTURE_HOME"
 ENV_FILES = ("capture.env", "site.env")
+# UUID FAT/exFAT (D468-AC1E) atau ext4 (8-4-4-4-12 hex); dipakai di path /dev/disk/by-uuid.
+USB_UUID_RE = re.compile(r"^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$|^[0-9a-fA-F-]{36}$")
 
 
 class ConfigError(ValueError):
@@ -25,6 +27,15 @@ def check_site(name: str) -> str:
         raise ConfigError(f"Nama site {name!r} tidak valid: huruf kecil, angka, dan '-' "
                           "(maks 40 karakter), diawali huruf/angka")  # fmt: skip
     return name
+
+
+def check_usb_uuid(value: str) -> str | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    if not USB_UUID_RE.match(value):
+        raise ConfigError(f"CAPTURE_USB_UUID {value!r} tidak valid (contoh: D468-AC1E, lihat lsblk -f)")
+    return value
 
 
 def parse_aspect(value: str) -> tuple[int, int] | None:
@@ -52,6 +63,9 @@ class Config:
     password: str = field(repr=False)
     out_dir: Path  # folder site aktif: <root_dir>/<site>
     root_dir: Path  # CAPTURE_DIR; status.json ada di sini
+    # UUID flashdisk (CAPTURE_USB_UUID). Bila diisi, CAPTURE_DIR adalah titik mount-nya dan
+    # perekam hanya menyimpan saat flashdisk terpasang di sana (tidak jatuh ke memori internal).
+    usb_uuid: str | None = None
     site: str = DEFAULT_SITE
     prefix: str = "ppe"
     camera_ids: tuple[int, ...] = ()  # kosong = semua kamera yang aktif
@@ -152,7 +166,8 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
         raise ConfigError("CAPTURE_ASPECT harus auto, off, atau rasio seperti 16:9")
     cfg = Config(
         sg_url=url, username=username, password=password, out_dir=Path(out_dir) / site,
-        root_dir=Path(out_dir), site=site, prefix=prefix,
+        root_dir=Path(out_dir), usb_uuid=check_usb_uuid(e.get("CAPTURE_USB_UUID", "")),
+        site=site, prefix=prefix,
         camera_ids=cameras, classes=classes, person_class=person, ca_file=ca_file,
         insecure_tls=insecure, aspect=aspect,
         interval_s=num("CAPTURE_INTERVAL_S", 10.0),

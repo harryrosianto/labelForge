@@ -1,0 +1,13 @@
+# Menjalankan lfcapture-lan.service segera setelah user manager mulai (saat boot, lewat linger)
+# lalu tiap menit.
+[Unit]
+Description=Jaga IP port LAN sesuai lan.env
+
+[Timer]
+OnStartupSec=1s
+# Jadwal kalender, bukan OnUnitActiveSec: tetap jalan walau percobaan sebelumnya gagal.
+OnCalendar=minutely
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

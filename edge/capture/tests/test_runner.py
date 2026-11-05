@@ -154,3 +154,23 @@ def test_wrong_password_keeps_retrying_without_crash(tmp_path, fake, monkeypatch
 
     asyncio.run(main())
     assert fake.logins == 0 and not list(tmp_path.rglob("*.jpg"))
+
+
+def test_status_pauses_and_resumes_with_usb(tmp_path, monkeypatch):
+    import os
+
+    from lfcapture.runner import Recorder
+
+    root = tmp_path / "dataset-usb"
+    cfg = make_config(root, CAPTURE_USB_UUID="D468-AC1E")
+    mounted = {"on": False}
+    monkeypatch.setattr(os.path, "ismount", lambda p: mounted["on"] and str(p) == str(root))
+    rec = Recorder(cfg)
+    rec._write_status()
+    status = json.loads((root / "status.json").read_text())
+    assert rec.disk_full and status["disk_full"] and "tidak terpasang" in status["storage_problem"]
+
+    mounted["on"] = True
+    rec._write_status()
+    status = json.loads((root / "status.json").read_text())
+    assert not rec.disk_full and status["storage_problem"] is None and status["disk"]["usb_mounted"]

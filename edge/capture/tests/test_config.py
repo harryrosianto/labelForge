@@ -61,3 +61,11 @@ def test_aspect_setting(tmp_path):
         make_config(tmp_path, CAPTURE_ASPECT="lebar")
     assert parse_aspect("1280x720") == (1280, 720) and parse_aspect("4:3") == (4, 3)
     assert parse_aspect("0x720") is None and parse_aspect("") is None
+
+
+def test_usb_uuid(tmp_path):
+    assert make_config(tmp_path).usb_uuid is None
+    assert make_config(tmp_path, CAPTURE_USB_UUID="D468-AC1E").usb_uuid == "D468-AC1E"
+    for bad in ("../sda1", "D468AC1E", "D468-AC1E; rm"):
+        with pytest.raises(ConfigError, match="CAPTURE_USB_UUID"):
+            make_config(tmp_path, CAPTURE_USB_UUID=bad)

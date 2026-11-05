@@ -1,82 +1,99 @@
 <#
 .SYNOPSIS
-  Menarik folder dataset harian dari perangkat edge ke laptop, lalu membuat ZIP per hari
-  yang siap diimport di LabelForge (Upload -> Import dataset, centang tandai untuk review).
+  Menarik dataset dari perangkat edge ke laptop, lalu membuat ZIP per hari yang siap diimport
+  di LabelForge (Upload -> Import dataset, centang tandai untuk review).
+
+.DESCRIPTION
+  Hanya dua koneksi SSH, berapa pun jumlah site dan harinya: satu untuk daftar (lfc inventory),
+  satu untuk mengirim (lfc export). Frame yang sudah ada di laptop tidak dikirim ulang, jadi
+  tarikan berulang di hari yang sama hanya membawa frame baru. Cocok untuk koneksi 4G yang
+  lambat; ringkasan ditampilkan sebelum menarik.
 
 .EXAMPLE
-  .\tarik-dataset.ps1 -Device sysedge@192.168.110.243 -Tujuan D:\dataset-edge
-  .\tarik-dataset.ps1 -Device sysedge@192.168.110.243 -Tujuan D:\dataset-edge -Site mondelez-cikarang
+  .\tarik-dataset.ps1 -Device sysedge@100.119.125.104 -Tujuan D:\dataset-edge
+  .\tarik-dataset.ps1 -Device sysedge@100.119.125.104 -Tujuan D:\dataset-edge -Site prepare-mondelez -Cek
 
-  Hasil: <Tujuan>\<site>\<site>-ppe-YYYYMMDD.zip. Tanpa -Site semua site ditarik. Folder yang
-  sudah pernah ditarik dilewati, kecuali folder hari ini (masih bertambah) atau bila -Ulang
-  dipakai. Data di perangkat tidak dihapus; setelah ZIP diperiksa, hapus di perangkat dengan
-  `lfc clean <site> --older-than <hari>`.
+  Hasil: <Tujuan>\<site>\<site>-ppe-YYYYMMDD.zip. -Cek hanya menampilkan ringkasan tanpa menarik.
+  -Ulang menarik ulang semua frame. Data di perangkat tidak dihapus; setelah ZIP diperiksa,
+  hapus di perangkat dengan `lfc clean <site> --older-than <hari>`.
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Device,
     [Parameter(Mandatory = $true)][string]$Tujuan,
     [string]$Site,
-    [string]$Sumber = "dataset",
+    [switch]$Cek,
     [switch]$Ulang
 )
 $ErrorActionPreference = "Stop"
-# Koneksi gagal/putus terdeteksi dalam ~1 menit, bukan menggantung (Wi-Fi perangkat bisa naik-turun).
-$sshOpt = @("-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4")
+# Koneksi gagal/putus terdeteksi dalam ~1 menit, bukan menggantung.
+$sshOpt = "-o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
+$lfc = ".local/bin/lfc"
+$tarExe = Join-Path $env:SystemRoot "System32\tar.exe"   # GNU tar (mis. dari Git) salah membaca "C:\..."
+$mulai = Get-Date
 
-if ($Site) {
-    $sites = @($Site)
-} else {
-    $sites = ssh @sshOpt $Device "find $Sumber -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort"
-    if ($LASTEXITCODE -ne 0 -or -not $sites) { throw "Tidak ada site di ${Device}:$Sumber" }
-}
+# --- 1. daftar di perangkat (koneksi SSH pertama) ---------------------------------------------
+$inv = cmd /c "ssh $sshOpt $Device $lfc inventory"
+if ($LASTEXITCODE -ne 0) { throw "lfc inventory gagal di $Device (sudah versi terbaru?)" }
+$hari = @($inv | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+if ($Site) { $hari = @($hari | Where-Object { $_.site -eq $Site }) }
+if (-not $hari) { Write-Host "Tidak ada data di $Device$(if ($Site) { " untuk site $Site" })"; return }
+
 $hariIni = (Get-Date).ToUniversalTime().ToString("yyyyMMdd")   # nama folder memakai UTC
-
-foreach ($s in $sites) {
-    if ($s -notmatch '^[a-z0-9][a-z0-9-]{0,39}$') { Write-Host "lewati '$s' (bukan nama site)"; continue }
-    $hari = ssh @sshOpt $Device "cd $Sumber/$s 2>/dev/null && ls -d *-[0-9]*[0-9] 2>/dev/null"
-    if (-not $hari) { Write-Host "site ${s}: belum ada data"; continue }
-    $dirSite = Join-Path $Tujuan $s
-    New-Item -ItemType Directory -Force $dirSite | Out-Null
-
-    foreach ($nama in $hari) {
-        $lokal = Join-Path $dirSite $nama
-        $zip = Join-Path $dirSite "$s-$nama.zip"
-        $masihBerjalan = $nama.EndsWith($hariIni)
-        if ((Test-Path $zip) -and -not $Ulang -and -not $masihBerjalan) {
-            Write-Host "lewati $s/$nama (sudah ada)"
-            continue
-        }
-        Write-Host "menarik $s/$nama ..."
-        if (Test-Path $lokal) { Remove-Item -Recurse -Force $lokal }
-        # Satu aliran tar per hari (jauh lebih cepat dari salin per file). Pipa PowerShell 5.1
-        # merusak data biner, jadi aliran ditulis ke file lewat cmd, lalu dibuka tar.exe Windows.
-        $tar = Join-Path $dirSite "$nama.tar"
-        # GNU tar keluar 1 bila ada file yang berubah saat dibaca (folder hari ini masih ditulis
-        # perekam); itu wajar, frame yang belum lengkap dibuang di bawah.
-        $remote = "tar --warning=no-file-changed -C $Sumber/$s -cf - $nama; rc=`$?; [ `$rc -le 1 ]"
-        cmd /c "ssh $($sshOpt -join ' ') $Device `"$remote`" > `"$tar`""
-        if ($LASTEXITCODE -ne 0) { Remove-Item -Force $tar -ErrorAction SilentlyContinue; throw "menarik $s/$nama gagal" }
-        # tar.exe bawaan Windows; GNU tar (mis. dari Git) membaca "C:\..." sebagai host remote.
-        & (Join-Path $env:SystemRoot "System32\tar.exe") -xf $tar -C $dirSite
-        if ($LASTEXITCODE -ne 0) { throw "membuka $tar gagal" }
-        Remove-Item -Force $tar
-        # File .tmp dari penulisan yang sedang berlangsung tidak ikut ke ZIP.
-        Get-ChildItem $lokal -Recurse -Filter *.tmp | Remove-Item -Force
-        # Folder hari ini masih ditulis saat disalin: frame yang tersalin tanpa pasangannya
-        # dibuang (gambar tanpa label terbaca sebagai contoh negatif). Lengkap di tarikan berikutnya.
-        $img = Join-Path $lokal "images"; $lbl = Join-Path $lokal "labels"
-        $tidakLengkap = 0
-        foreach ($f in Get-ChildItem $img -File) {
-            if (-not (Test-Path (Join-Path $lbl "$($f.BaseName).txt"))) { Remove-Item -Force $f.FullName; $tidakLengkap++ }
-        }
-        foreach ($f in Get-ChildItem $lbl -File) {
-            if (-not (Test-Path (Join-Path $img "$($f.BaseName).jpg"))) { Remove-Item -Force $f.FullName; $tidakLengkap++ }
-        }
-        if ($tidakLengkap) { Write-Host "  $tidakLengkap file tanpa pasangan dilewati (masih ditulis)" }
-        if (Test-Path $zip) { Remove-Item -Force $zip }
-        Compress-Archive -Path (Join-Path $lokal "*") -DestinationPath $zip
-        $jumlah = (Get-ChildItem $img -File).Count
-        $catatan = if ($masihBerjalan) { " (hari ini, masih bertambah)" } else { "" }
-        Write-Host ("  {0} gambar -> {1}{2}" -f $jumlah, $zip, $catatan)
+$rencana = @()
+foreach ($h in $hari) {
+    $lokal = Join-Path (Join-Path $Tujuan $h.site) $h.day
+    $zip = Join-Path (Join-Path $Tujuan $h.site) "$($h.site)-$($h.day).zip"
+    if ($Ulang -and (Test-Path $lokal)) { Remove-Item -Recurse -Force $lokal }
+    $punya = @()
+    if (Test-Path (Join-Path $lokal "images")) {
+        $punya = @(Get-ChildItem (Join-Path $lokal "images") -Filter *.jpg -File |
+            Where-Object { Test-Path (Join-Path $lokal "labels\$($_.BaseName).txt") } |
+            ForEach-Object { $_.BaseName })
+    }
+    $kurang = [Math]::Max($h.frames - $punya.Count, 0)
+    $perluZip = $kurang -gt 0 -or -not (Test-Path $zip)
+    $kb = if ($h.frames) { [Math]::Round($h.bytes * $kurang / $h.frames / 1KB) } else { 0 }
+    $rencana += [pscustomobject]@{
+        Site = $h.site; Hari = $h.day; DiPerangkat = $h.frames; SudahAda = $punya.Count
+        AkanDitarik = $kurang; PerkiraanKB = $kb; Lokal = $lokal; Zip = $zip; Punya = $punya
+        PerluZip = $perluZip; HariIni = $h.day.EndsWith($hariIni)
     }
 }
+$rencana | Format-Table Site, Hari, DiPerangkat, SudahAda, AkanDitarik, PerkiraanKB -AutoSize | Out-Host
+$totalKB = ($rencana | Measure-Object PerkiraanKB -Sum).Sum
+Write-Host ("Total akan ditarik: {0} frame, sekitar {1:N1} MB" -f ($rencana | Measure-Object AkanDitarik -Sum).Sum, ($totalKB / 1024))
+if ($Cek) { return }
+
+# --- 2. kirim hanya yang belum ada (koneksi SSH kedua) ----------------------------------------
+$tarik = @($rencana | Where-Object { $_.AkanDitarik -gt 0 })
+New-Item -ItemType Directory -Force $Tujuan | Out-Null
+if ($tarik) {
+    $req = Join-Path $Tujuan ".tarik-permintaan.txt"
+    $tar = Join-Path $Tujuan ".tarik-data.tar"
+    $baris = foreach ($r in $tarik) {
+        "DAY $($r.Site) $($r.Hari)"
+        foreach ($s in $r.Punya) { "HAVE $($r.Site) $($r.Hari) $s" }
+    }
+    [IO.File]::WriteAllLines($req, [string[]]$baris)   # ASCII/UTF-8 tanpa BOM
+    $t0 = Get-Date
+    cmd /c "ssh $sshOpt $Device $lfc export < `"$req`" > `"$tar`""
+    if ($LASTEXITCODE -ne 0) { Remove-Item -Force $tar -ErrorAction SilentlyContinue; throw "lfc export gagal" }
+    $detik = ((Get-Date) - $t0).TotalSeconds
+    $mb = (Get-Item $tar).Length / 1MB
+    Write-Host ("Diterima {0:N1} MB dalam {1:N0} detik ({2:N2} Mbit/s)" -f $mb, $detik, ($mb * 8 * 1.048576 / [Math]::Max($detik, 0.1)))
+    & $tarExe -xf $tar -C $Tujuan
+    if ($LASTEXITCODE -ne 0) { throw "membuka $tar gagal" }
+    Remove-Item -Force $tar, $req
+}
+
+# --- 3. ZIP per hari yang berubah -------------------------------------------------------------
+foreach ($r in $rencana | Where-Object { $_.PerluZip }) {
+    if (-not (Test-Path $r.Lokal)) { continue }
+    Get-ChildItem $r.Lokal -Recurse -Filter *.tmp | Remove-Item -Force
+    if (Test-Path $r.Zip) { Remove-Item -Force $r.Zip }
+    Compress-Archive -Path (Join-Path $r.Lokal "*") -DestinationPath $r.Zip
+    $jumlah = (Get-ChildItem (Join-Path $r.Lokal "images") -File).Count
+    $catatan = if ($r.HariIni) { " (hari ini, masih bertambah)" } else { "" }
+    Write-Host ("  {0} gambar -> {1}{2}" -f $jumlah, $r.Zip, $catatan)
+}
+Write-Host ("Selesai dalam {0:N0} detik" -f ((Get-Date) - $mulai).TotalSeconds)

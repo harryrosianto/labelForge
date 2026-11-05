@@ -10,13 +10,14 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from lfcapture.config import DEFAULT_SITE, check_site, lfcapture_home
+from lfcapture.config import DEFAULT_SITE, SITE_RE, check_site, check_usb_uuid, lfcapture_home
 
 SERVICE = "lfcapture.service"
 DAY_RE = re.compile(r"^(?P<prefix>.+)-(?P<day>\d{8})$")
@@ -34,6 +35,7 @@ class Paths:
     home: Path  # ~/lfcapture
     root: Path  # CAPTURE_DIR
     site: str
+    usb_uuid: str | None = None  # CAPTURE_USB_UUID: CAPTURE_DIR adalah titik mount flashdisk
 
     @property
     def site_dir(self) -> Path:
@@ -53,10 +55,18 @@ def load_paths(env: Mapping[str, str]) -> Paths:
     if not root:
         raise SystemExit("CAPTURE_DIR belum diisi di capture.env")
     site = check_site(env.get("CAPTURE_SITE", "").strip() or DEFAULT_SITE)
-    return Paths(lfcapture_home(env), Path(root), site)
+    return Paths(lfcapture_home(env), Path(root), site, check_usb_uuid(env.get("CAPTURE_USB_UUID", "")))
 
 
 # --- ringkasan data -----------------------------------------------------------
+def site_dirs(root: Path) -> list[Path]:
+    """Folder site di CAPTURE_DIR. Folder lain (mis. "System Volume Information" buatan Windows
+    di flashdisk) diabaikan."""
+    if not root.is_dir():
+        return []
+    return sorted(x for x in root.iterdir() if x.is_dir() and SITE_RE.match(x.name))
+
+
 def day_folders(site_dir: Path) -> list[tuple[date, Path]]:
     out = []
     for p in site_dir.iterdir() if site_dir.is_dir() else []:
@@ -128,6 +138,17 @@ def cmd_status(p: Paths, run: Systemctl = systemctl, now: datetime | None = None
     print(f"autostart : {'on' if props.get('UnitFileState') == 'enabled' else 'off'}"
           f" (linger: {linger_state()})")  # fmt: skip
     print(f"site      : {p.site}  ({p.site_dir})")
+    if p.usb_uuid:
+        state = "terpasang" if os.path.ismount(p.root) else (
+            "TIDAK terpasang (tercolok, jalankan: lfc usb pasang)" if usb_device(p.usb_uuid).exists()
+            else "TIDAK terpasang (tidak tercolok)")
+        print(f"flashdisk : {p.usb_uuid} {state}")
+    try:
+        lan = lan_summary(p.home)
+    except (OSError, ValueError) as e:
+        lan = f"pengaturan lan.env tidak terbaca ({e})"
+    if lan:
+        print(f"LAN       : {lan}")
 
     status_file = p.root / "status.json"
     if status_file.exists():
@@ -139,8 +160,10 @@ def cmd_status(p: Paths, run: Systemctl = systemctl, now: datetime | None = None
         if st.get("site") not in (None, p.site) and active:
             print(f"            perekam masih memakai site {st['site']!r}; jalankan: lfc start")
         disk = st.get("disk") or {}
-        full = "  PENUH, perekaman berhenti" if st.get("disk_full") else ""
-        print(f"disk      : {disk.get('used_pct')}% terpakai, sisa {human((disk.get('free_mb') or 0) * 2**20)}{full}")
+        if disk.get("used_pct") is not None:
+            print(f"disk      : {disk.get('used_pct')}% terpakai, sisa {human((disk.get('free_mb') or 0) * 2**20)}")
+        if st.get("disk_full"):
+            print(f"PERHATIAN : perekaman BERHENTI, {st.get('storage_problem') or 'disk penuh'}")
     else:
         print("SysGuard  : belum ada status.json (perekam belum pernah berjalan)")
 
@@ -195,7 +218,8 @@ def cmd_site(p: Paths, new: str | None, run: Systemctl = systemctl) -> int:
         p.site_env.write_text(f"CAPTURE_SITE={new}\n", encoding="utf-8")
     finally:
         os.umask(old)
-    (p.root / new).mkdir(parents=True, exist_ok=True)
+    if not p.usb_uuid or os.path.ismount(p.root):  # tanpa flashdisk: jangan isi memori internal
+        (p.root / new).mkdir(parents=True, exist_ok=True)
     print(f"site aktif: {new}  ({p.root / new})")
     if run("is-active", SERVICE).stdout.strip() == "active":
         return cmd_service("restart", run)
@@ -208,7 +232,7 @@ def cmd_sites(p: Paths) -> int:
         print("belum ada data")
         return 0
     rows = []
-    for site_dir in sorted(x for x in p.root.iterdir() if x.is_dir()):
+    for site_dir in site_dirs(p.root):
         days = day_folders(site_dir)
         images, size = folder_size(site_dir)
         span = f"{days[0][0]:%Y-%m-%d} s/d {days[-1][0]:%Y-%m-%d}" if days else "-"
@@ -288,6 +312,323 @@ def cmd_reset(p: Paths, site: str, given: str | None, run: Systemctl = systemctl
     shutil.rmtree(site_dir)
     print(f"site {site} dihapus")
     return 0
+
+
+# --- tarik dataset (dipakai deploy/tarik-dataset.ps1 lewat SSH) ------------------------------
+def complete_stems(day_dir: Path) -> dict[str, int]:
+    """Frame lengkap (gambar + label) di satu folder harian -> ukuran gambar+label (byte).
+
+    Gambar ditulis setelah labelnya (lihat writer), jadi frame yang sedang ditulis belum ikut.
+    """
+    images, labels = day_dir / "images", day_dir / "labels"
+    out = {}
+    for img in images.glob("*.jpg") if images.is_dir() else []:
+        label = labels / f"{img.stem}.txt"
+        if label.exists():
+            out[img.stem] = img.stat().st_size + label.stat().st_size
+    return out
+
+
+def cmd_inventory(p: Paths, out=None) -> int:
+    """Satu baris JSON per folder harian: site, day, frames, bytes."""
+    out = out or sys.stdout
+    for site_dir in site_dirs(p.root):
+        for _, day in day_folders(site_dir):
+            stems = complete_stems(day)
+            out.write(json.dumps({"site": site_dir.name, "day": day.name, "frames": len(stems),
+                                  "bytes": sum(stems.values())}) + "\n")  # fmt: skip
+    return 0
+
+
+def parse_export_request(lines, root: Path) -> dict[tuple[str, str], set[str]]:
+    """Baris 'DAY <site> <folder>' dan 'HAVE <site> <folder> <stem>' -> {(site, folder): stem yang sudah ada}.
+
+    Nama site & folder divalidasi supaya permintaan tidak bisa keluar dari CAPTURE_DIR.
+    """
+    want: dict[tuple[str, str], set[str]] = {}
+    for raw in lines:
+        parts = raw.strip().split()
+        if not parts:
+            continue
+        if parts[0] not in ("DAY", "HAVE") or len(parts) != (3 if parts[0] == "DAY" else 4):
+            raise ValueError(f"baris permintaan tidak dikenal: {raw.strip()[:80]!r}")
+        site, folder = check_site(parts[1]), parts[2]
+        if not DAY_RE.match(folder) or not _inside(root, root / site / folder):
+            raise ValueError(f"folder harian tidak valid: {folder!r}")
+        have = want.setdefault((site, folder), set())
+        if parts[0] == "HAVE":
+            have.add(parts[3])
+    return want
+
+
+def cmd_export(p: Paths, request, out) -> int:
+    """Tulis tar (stream) berisi frame lengkap yang belum dimiliki peminta, plus data.yaml & meta.
+
+    Path di dalam tar: <site>/<folder>/..., jadi bisa dibuka langsung di folder tujuan laptop.
+    """
+    import tarfile
+
+    want = parse_export_request(request, p.root)
+    with tarfile.open(fileobj=out, mode="w|") as tar:
+        for (site, folder), have in sorted(want.items()):
+            day = p.root / site / folder
+            if not day.is_dir():
+                continue
+            base = f"{site}/{folder}"
+            extras = [day / "data.yaml", *sorted((day / "meta").glob("*.jsonl"))]
+            for f in extras:
+                if f.exists():
+                    tar.add(f, arcname=f"{base}/{f.relative_to(day).as_posix()}")
+            for stem in sorted(set(complete_stems(day)) - have):
+                tar.add(day / "labels" / f"{stem}.txt", arcname=f"{base}/labels/{stem}.txt")
+                tar.add(day / "images" / f"{stem}.jpg", arcname=f"{base}/images/{stem}.jpg")
+    return 0
+
+
+# --- flashdisk (CAPTURE_USB_UUID) ------------------------------------------------------------
+# /etc di perangkat read-only (tanpa fstab/unit sistem), jadi mount dilakukan lewat `sudo -n`
+# oleh `lfc usb pasang`, yang juga dijalankan saat boot oleh deploy/lfcapture-usb.service.
+USB_FS = ("vfat", "exfat")  # bisa langsung dibaca laptop Windows
+STATUS_FILES = {"status.json", "status.json.tmp"}
+
+
+def usb_device(uuid: str) -> Path:
+    return Path("/dev/disk/by-uuid") / uuid
+
+
+def sudo(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["sudo", "-n", *args], capture_output=True, text=True, timeout=60)
+
+
+def usb_fstype(dev: Path) -> str:
+    try:
+        return subprocess.run(["lsblk", "-no", "FSTYPE", str(dev)], capture_output=True,
+                              text=True, timeout=10).stdout.strip()  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def usb_mount_options(fstype: str) -> str:
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    gid = os.getgid() if hasattr(os, "getgid") else 0
+    # FAT tanpa izin per file: semua milik user perekam, tertutup untuk user lain. `flush`
+    # menulis ke flashdisk lebih cepat sehingga lebih sedikit data hilang bila listrik padam.
+    opts = f"rw,noatime,nosuid,nodev,noexec,uid={uid},gid={gid},fmask=0177,dmask=0077"
+    return opts + (",flush" if fstype == "vfat" else "")
+
+
+def _need_usb(p: Paths) -> str:
+    if not p.usb_uuid:
+        raise SystemExit("CAPTURE_USB_UUID belum diisi di capture.env (lihat README, bagian Flashdisk)")
+    return p.usb_uuid
+
+
+def cmd_usb_status(p: Paths, fstype: Callable[[Path], str] = usb_fstype) -> int:
+    uuid = _need_usb(p)
+    dev = usb_device(uuid)
+    mounted = os.path.ismount(p.root)
+    print(f"flashdisk : {uuid}  {'tercolok' if dev.exists() else 'TIDAK tercolok'}"
+          f"{f' ({fstype(dev)})' if dev.exists() else ''}")  # fmt: skip
+    print(f"mount     : {p.root}  {'terpasang' if mounted else 'TIDAK terpasang'}")
+    if mounted:
+        usage = shutil.disk_usage(p.root)
+        print(f"isi       : {human(usage.total - usage.free)} terpakai dari {human(usage.total)}, "
+              f"sisa {human(usage.free)}")  # fmt: skip
+    elif dev.exists():
+        print("pasang dengan: lfc usb pasang")
+    return 0 if mounted else 1
+
+
+def cmd_usb_pasang(p: Paths, start: bool = True, wait_s: float = 0,
+                   run_sudo: Callable[..., subprocess.CompletedProcess] = sudo,
+                   run: Systemctl = systemctl, fstype: Callable[[Path], str] = usb_fstype,
+                   sleep: Callable[[float], None] = time.sleep) -> int:  # fmt: skip
+    uuid = _need_usb(p)
+    if os.path.ismount(p.root):
+        print(f"flashdisk sudah terpasang di {p.root}")
+    else:
+        dev = usb_device(uuid)
+        waited = 0.0
+        while not dev.exists() and waited < wait_s:  # saat boot USB bisa terdeteksi belakangan
+            sleep(1)
+            waited += 1
+        if not dev.exists():
+            print(f"flashdisk {uuid} tidak tercolok; perekam tidak menyimpan sampai dipasang")
+            return 1
+        fs = fstype(dev)
+        if fs not in USB_FS:
+            print(f"format flashdisk {fs or '?'} tidak didukung; format ulang sebagai FAT32/exFAT di laptop")
+            return 1
+        p.root.mkdir(parents=True, exist_ok=True)
+        hidden = [x.name for x in p.root.iterdir() if x.name not in STATUS_FILES]
+        if hidden:
+            print(f"PERHATIAN: {p.root} di memori internal berisi {', '.join(sorted(hidden)[:5])}; "
+                  "isinya tertutup selama flashdisk terpasang")  # fmt: skip
+        r = run_sudo("mount", "-t", fs, "-o", usb_mount_options(fs), str(dev), str(p.root))
+        if r.returncode != 0:
+            print(f"mount gagal: {(r.stderr or r.stdout).strip()}", file=sys.stderr)
+            return 1
+        print(f"flashdisk {uuid} terpasang di {p.root}")
+    if start and run("is-active", SERVICE).stdout.strip() != "active":
+        return cmd_service("start", run)
+    return 0
+
+
+def cmd_usb_lepas(p: Paths, run_sudo: Callable[..., subprocess.CompletedProcess] = sudo,
+                  run: Systemctl = systemctl) -> int:
+    _need_usb(p)
+    if not os.path.ismount(p.root):
+        print(f"flashdisk tidak terpasang di {p.root}; aman dicabut")
+        return 0
+    was_active = run("is-active", SERVICE).stdout.strip() == "active"
+    if was_active:
+        cmd_service("stop", run)
+    if hasattr(os, "sync"):
+        os.sync()
+    r = run_sudo("umount", str(p.root))
+    if r.returncode != 0:
+        print(f"umount gagal: {(r.stderr or r.stdout).strip()}\n"
+              f"Pastikan tidak ada terminal yang sedang berada di {p.root} (cd ~), lalu ulangi.",
+              file=sys.stderr)  # fmt: skip
+        return 1
+    print(f"flashdisk AMAN DICABUT.{' Perekam dihentikan.' if was_active else ''}\n"
+          "Setelah dicolok lagi: lfc usb pasang  (perekam ikut dimulai)")
+    return 0
+
+
+# --- IP port LAN (lan.env) -------------------------------------------------------------------
+# Firmware memasang alamat recovery 192.168.100.1/24 di eth0 dan tidak mengizinkan alamat lain
+# di subnet itu (aturan R57). Di site yang jaringan CCTV-nya juga 192.168.100.0/24 dan .1 sudah
+# dipakai (biasanya gateway), alamat itu bentrok. `lfc lan terapkan` (dijalankan saat boot dan
+# tiap menit oleh deploy/lfcapture-lan.timer) melepas alamat itu dan memasang alamat dari IT.
+# Ini tambalan per site sampai firmware bisa memindah recovery subnet.
+LAN_ENV = "lan.env"
+IFACE_RE = re.compile(r"^[a-z0-9]{1,15}$")
+
+
+@dataclass
+class LanConfig:
+    iface: str
+    addr: str  # alamat yang dipasang, mis. 192.168.100.245/24
+    drop: str  # alamat yang dilepas, mis. 192.168.100.1/24
+
+
+def load_lan(home: Path) -> LanConfig | None:
+    import ipaddress
+
+    from lfcapture.config import ConfigError, read_env_file
+
+    path = home / LAN_ENV
+    if not path.exists():
+        return None
+    env = read_env_file(path)
+    iface = env.get("LAN_IFACE", "eth0").strip()
+    if not IFACE_RE.match(iface):
+        raise ConfigError(f"LAN_IFACE {iface!r} tidak valid")
+    out = {}
+    for key, default in (("LAN_ADDR", ""), ("LAN_DROP", "192.168.100.1/24")):
+        raw = env.get(key, default).strip()
+        try:
+            if "/" not in raw:
+                raise ValueError
+            out[key] = str(ipaddress.IPv4Interface(raw))
+        except ValueError:
+            raise ConfigError(f"{key} di {path} harus alamat IPv4 dengan prefix, mis. 192.168.100.245/24") from None
+    if out["LAN_ADDR"] == out["LAN_DROP"]:
+        raise ConfigError("LAN_ADDR dan LAN_DROP tidak boleh sama")
+    return LanConfig(iface, out["LAN_ADDR"], out["LAN_DROP"])
+
+
+def iface_addrs(iface: str) -> list[str]:
+    """Alamat IPv4 di interface, mis. ['192.168.100.245/24']."""
+    r = subprocess.run(["ip", "-j", "-4", "addr", "show", "dev", iface], capture_output=True, text=True, timeout=10)
+    if r.returncode != 0:
+        raise OSError(r.stderr.strip() or f"interface {iface} tidak ada")
+    return [f"{a['local']}/{a['prefixlen']}" for link in json.loads(r.stdout or "[]") for a in link.get("addr_info", [])]
+
+
+def link_up(iface: str) -> bool:
+    try:
+        return Path(f"/sys/class/net/{iface}/carrier").read_text().strip() == "1"
+    except OSError:  # interface turun: membaca carrier gagal dengan EINVAL
+        return False
+
+
+def arp_probe(iface: str, addr: str) -> str | None:
+    """MAC perangkat lain yang memakai `addr` (tanpa prefix), None bila bebas."""
+    script = Path(__file__).with_name("arpprobe.py")
+    r = sudo(sys.executable, "-I", str(script), iface, addr, "3")
+    out = (r.stdout or "").strip()
+    if r.returncode == 0 and out == "BEBAS":
+        return None
+    if r.returncode == 1 and out.startswith("DIPAKAI"):
+        return out.split()[-1]
+    raise OSError(f"ARP probe gagal: {(r.stderr or out).strip()}")
+
+
+def cmd_lan_terapkan(home: Path, run_sudo: Callable[..., subprocess.CompletedProcess] = sudo,
+                     addrs: Callable[[str], list[str]] = iface_addrs,
+                     is_up: Callable[[str], bool] = link_up,
+                     probe: Callable[[str, str], str | None] = arp_probe) -> int:  # fmt: skip
+    cfg = load_lan(home)
+    if cfg is None:
+        return 0  # site tanpa lan.env: tidak ada yang diubah
+    current = addrs(cfg.iface)
+    rc = 0
+    if cfg.drop in current:
+        r = run_sudo("ip", "addr", "del", cfg.drop, "dev", cfg.iface)
+        if r.returncode != 0:
+            print(f"gagal melepas {cfg.drop} dari {cfg.iface}: {(r.stderr or r.stdout).strip()}", file=sys.stderr)
+            rc = 1
+        else:
+            print(f"{datetime.now(UTC):%Y-%m-%d %H:%M:%S} {cfg.drop} dilepas dari {cfg.iface}")
+    if cfg.addr in current:
+        return rc
+    if not is_up(cfg.iface):
+        # Tanpa kabel tidak bisa dicek bentrok; dipasang setelah kabel tercolok (timer tiap menit).
+        return rc
+    ip = cfg.addr.split("/")[0]
+    used_by = probe(cfg.iface, ip)
+    if used_by:
+        print(f"{datetime.now(UTC):%Y-%m-%d %H:%M:%S} PERINGATAN: {ip} sudah dipakai perangkat {used_by}; tidak dipasang. "
+              f"Minta IP lain ke IT lalu ubah LAN_ADDR di {home / LAN_ENV}", file=sys.stderr)  # fmt: skip
+        return 1
+    r = run_sudo("ip", "addr", "add", cfg.addr, "dev", cfg.iface)
+    if r.returncode != 0:
+        print(f"gagal memasang {cfg.addr} di {cfg.iface}: {(r.stderr or r.stdout).strip()}", file=sys.stderr)
+        return 1
+    print(f"{datetime.now(UTC):%Y-%m-%d %H:%M:%S} {cfg.addr} dipasang di {cfg.iface}")
+    return rc
+
+
+def lan_summary(home: Path, addrs: Callable[[str], list[str]] = iface_addrs,
+                is_up: Callable[[str], bool] = link_up) -> str | None:  # fmt: skip
+    cfg = load_lan(home)
+    if cfg is None:
+        return None
+    try:
+        current = addrs(cfg.iface)
+    except OSError as e:
+        return f"{cfg.iface} tidak terbaca ({e})"
+    state = "OK" if cfg.addr in current and cfg.drop not in current else "BELUM SESUAI"
+    if cfg.drop in current:
+        state += f", {cfg.drop} masih terpasang"
+    if cfg.addr not in current:
+        state += f", {cfg.addr} belum dipasang" + ("" if is_up(cfg.iface) else " (kabel tidak tercolok)")
+    return f"{cfg.iface} {cfg.addr} [{state}]"
+
+
+def cmd_lan_status(home: Path) -> int:
+    cfg = load_lan(home)
+    if cfg is None:
+        print(f"tidak dipakai (tidak ada {home / LAN_ENV})")
+        return 0
+    print(f"pengaturan: {cfg.iface} pasang {cfg.addr}, lepas {cfg.drop}")
+    print(f"link      : {'tercolok' if link_up(cfg.iface) else 'tidak tercolok'}")
+    print(f"alamat    : {', '.join(iface_addrs(cfg.iface)) or '-'}")
+    summary = lan_summary(home) or ""
+    print(f"status    : {summary.split('[', 1)[-1].rstrip(']')}")
+    return 0 if summary.endswith("[OK]") else 1
 
 
 # --- akses jarak jauh (Tailscale userspace, lihat deploy/install-tailscale.sh) -----------------
