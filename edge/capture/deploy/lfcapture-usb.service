@@ -1,0 +1,19 @@
+# Memasang flashdisk penyimpan dataset (CAPTURE_USB_UUID) ke CAPTURE_DIR saat boot, sebelum
+# perekam mulai. Service user terpisah karena lfcapture.service memakai NoNewPrivileges, yang
+# mencegah `sudo`; /etc di perangkat read-only sehingga fstab/unit mount sistem tidak bisa dipakai.
+# Bergantung pada `sudo -n mount/umount` tanpa password untuk user perekam.
+# Gagal (flashdisk tidak tercolok) tidak menghalangi perekam: perekam berjalan tetapi tidak
+# menyimpan apa pun sampai `lfc usb pasang`.
+[Unit]
+Description=Pasang flashdisk dataset lfcapture
+Before=lfcapture.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=PYTHONPATH=%h/lfcapture/src
+Environment=LFCAPTURE_HOME=%h/lfcapture
+ExecStart=-%h/lfcapture/venv/bin/python -m lfcapture usb pasang --tanpa-start --tunggu 30
+
+[Install]
+WantedBy=default.target

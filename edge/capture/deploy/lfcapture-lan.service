@@ -1,0 +1,17 @@
+# Melepas alamat recovery firmware (192.168.100.1/24 di eth0) dan memasang IP dari IT site,
+# sesuai ~/lfcapture/lan.env. Hanya untuk site yang jaringan CCTV-nya 192.168.100.0/24 dan
+# alamat .1 sudah dipakai di sana. Dijalankan saat boot dan tiap menit oleh lfcapture-lan.timer
+# (edged bisa memasang alamat recovery lagi). Bergantung pada `sudo -n ip` tanpa password.
+# Mematikan: systemctl --user disable --now lfcapture-lan.timer, lalu restart perangkat.
+[Unit]
+Description=IP port LAN pengganti alamat recovery (lfcapture lan.env)
+ConditionPathExists=%h/lfcapture/lan.env
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=%h/lfcapture/src
+Environment=LFCAPTURE_HOME=%h/lfcapture
+ExecStart=%h/lfcapture/venv/bin/python -m lfcapture lan terapkan
+# Journal user tidak terbaca tanpa grup systemd-journal; hanya perubahan/peringatan yang tercetak.
+StandardOutput=append:%h/lfcapture/logs/lan.log
+StandardError=append:%h/lfcapture/logs/lan.log

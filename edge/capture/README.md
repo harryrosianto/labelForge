@@ -117,14 +117,16 @@ lfc log [-f] [-n 50]           log perekam (file berotasi, maks ~3 MB, tanpa sud
 lfc clean <site> --older-than 7   hapus folder harian lebih tua dari 7 hari (bukan hari ini)
 lfc reset <site>               hapus seluruh data satu site
 lfc check                      uji login, kamera, snapshot, disk
+lfc usb [pasang|lepas]         flashdisk penyimpan dataset: status / pasang / lepas dengan aman
 lfc vpn [up]                   status akses jarak jauh / daftarkan perangkat ke Tailscale
+lfc lan [terapkan]             IP port LAN pengganti alamat recovery firmware (lan.env)
 ```
 
 - Nama site: huruf kecil, angka, dan `-`. Site aktif disimpan di `~/lfcapture/site.env`.
 - `clean` dan `reset` menampilkan apa yang akan dihapus lalu meminta konfirmasi (`hapus` atau
   nama site). Di sesi non-interaktif tambahkan `--konfirmasi <teks>`. `reset` menolak site
   yang sedang direkam: `lfc stop` atau pindah site dulu.
-- Saat batas disk tercapai perekaman berhenti (`lfc status` menandai PENUH); deteksi SysGuard
+- Saat batas disk tercapai perekaman berhenti (`lfc status` menandai BERHENTI); deteksi SysGuard
   tidak terpengaruh, dan perekaman lanjut sendiri setelah ruang dikosongkan.
 - Sesi SSH biasa sudah punya `lfc` di PATH. Untuk perintah satu baris dari laptop pakai path
   lengkap: `ssh sysedge@<ip> .local/bin/lfc status`.
@@ -158,16 +160,69 @@ tailnet yang sama: `ssh sysedge@<ip-tailscale> .local/bin/lfc status`, dan skrip
 `-Device sysedge@<ip-tailscale>`. Setelah update OS yang berpindah slot, jalankan ulang
 `sudo loginctl enable-linger sysedge` agar kedua service kembali jalan saat boot.
 
+### Flashdisk sebagai penyimpan dataset
+
+Slot microSD di board carrier tidak aktif pada CM5 versi eMMC, jadi penyimpanan tambahan memakai
+flashdisk USB (atau card reader USB). Flashdisk tetap FAT32/exFAT: perangkat tidak punya alat
+format, dan flashdisk bisa dicolok langsung ke laptop Windows, jauh lebih cepat daripada menarik
+lewat 4G. FAT tanpa *journaling*: listrik padam saat menulis bisa merusak file terakhir.
+
+1. Colok flashdisk, cari UUID-nya: `lsblk -f` (mis. `D468-AC1E`).
+2. Di `capture.env`: `CAPTURE_USB_UUID=D468-AC1E` dan `CAPTURE_DIR=/home/sysedge/dataset-usb`.
+3. `cd ~/lfcapture/src && sh deploy/install-service.sh`. Skrip memasang `lfcapture-usb.service`
+   yang me-mount flashdisk (berdasarkan UUID) ke `CAPTURE_DIR` saat boot, sebelum perekam.
+
+Selama flashdisk tidak terpasang, perekam tetap berjalan tetapi **tidak menyimpan** (tidak jatuh
+ke memori internal) dan `lfc status` menampilkan alasannya; setelah `lfc usb pasang`, perekaman
+lanjut sendiri dalam satu menit. Sebelum mencabut: `lfc usb lepas` (perekam dihentikan, data
+ditulis tuntas, flashdisk dilepas). Setelah dicolok lagi: `lfc usb pasang` (perekam ikut mulai).
+
+`/etc` read-only, jadi mount memakai `sudo -n mount`/`umount` tanpa password. Bila sudo tanpa
+password ditutup di firmware, mount otomatis berhenti bekerja dan perlu aturan sudo khusus untuk
+dua perintah itu.
+
+### Jaringan CCTV 192.168.100.x (alamat recovery firmware)
+
+Firmware selalu memasang alamat recovery `192.168.100.1/24` di port atas (eth0) dan menolak alamat
+lain di subnet itu lewat halaman Network (aturan R57). Bila jaringan CCTV site juga
+192.168.100.0/24, alamat `.1` di sana biasanya gateway: device akan bentrok dengannya, dan semua
+lalu lintas ke 192.168.100.x selalu lewat eth0 apa pun port yang dicolok.
+
+Tambalan per site, sampai firmware bisa memindah recovery subnet: minta satu IP kosong ke IT
+site, lalu di perangkat
+
+```bash
+printf 'LAN_IFACE=eth0\nLAN_ADDR=192.168.100.245/24\n' > ~/lfcapture/lan.env   # IP dari IT
+cd ~/lfcapture/src && sh deploy/install-service.sh
+lfc lan            # status; juga tampil di lfc status. Log: ~/lfcapture/logs/lan.log
+```
+
+`lfcapture-lan.timer` menjalankan `lfc lan terapkan` saat boot dan tiap menit: melepas `.1`, cek
+dengan ARP probe bahwa IP baru belum dipakai perangkat lain (bila dipakai, tidak dipasang dan
+peringatan dicatat), lalu memasangnya. Gateway tidak diisi, jadi internet tetap lewat Wi-Fi.
+
+- Saat boot, `.1` masih sempat aktif sekitar 10-60 detik sebelum service user berjalan.
+- Jalur recovery lewat eth0 hilang selama tambalan aktif; recovery lewat USB (192.168.7.1) tetap.
+- Butuh `sudo -n ip` tanpa password, sama seperti mount flashdisk.
+- Mematikan: hapus `lan.env`, `sh deploy/install-service.sh`, lalu restart perangkat.
+
 ### Menarik dataset ke laptop
 
 ```powershell
 .\edge\capture\deploy\tarik-dataset.ps1 -Device sysedge@<ip> -Tujuan D:\dataset-edge [-Site mondelez-cikarang]
 ```
 
-Tiap folder harian dikirim sebagai satu aliran tar lalu di-ZIP per site
-(`<Tujuan>\<site>\<site>-ppe-YYYYMMDD.zip`), siap diimport. Folder yang sudah ditarik dilewati
-kecuali folder hari ini; frame yang sedang ditulis saat ditarik dilewati dan ikut di tarikan
-berikutnya. Data di perangkat tidak dihapus: setelah ZIP diperiksa, `lfc clean`.
+Skrip hanya membuka dua koneksi SSH, berapa pun jumlah site dan harinya: `lfc inventory`
+untuk daftar, lalu `lfc export` yang mengirim satu aliran tar berisi **frame yang belum ada
+di laptop** saja. Tarikan berulang di hari yang sama hanya membawa frame baru. Sebelum
+menarik, skrip menampilkan ringkasan per hari (di perangkat, sudah ada, akan ditarik,
+perkiraan ukuran); tambahkan `-Cek` untuk ringkasan saja, `-Ulang` untuk menarik ulang semua.
+
+Hasil di-ZIP per hari (`<Tujuan>\<site>\<site>-ppe-YYYYMMDD.zip`), siap diimport. Frame yang
+sedang ditulis saat ditarik belum ikut dan terbawa di tarikan berikutnya. Lewat 4G (upload
+modem sering di bawah 1 Mbit/s), sekitar satu frame per detik: pantau dan tarik sampel lewat
+4G, tarik dataset penuh di lokasi atau setelah perangkat kembali. Data di perangkat tidak
+dihapus: setelah ZIP diperiksa, `lfc clean`.
 
 ## Test
 

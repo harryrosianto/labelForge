@@ -181,16 +181,30 @@ class Recorder:
                 await asyncio.wait_for(stop.wait(), timeout=self.cfg.stats_interval_s)
             except TimeoutError:
                 pass
-            disk = self.writer.disk_status()
-            if self.disk_full and disk["used_pct"] < self.cfg.disk_max_used_pct - 2 and \
-                    disk["free_mb"] >= self.cfg.disk_min_free_mb:
-                self.disk_full = False  # ruang sudah dikosongkan (data dipindah ke laptop)
-                log.info("disk cukup lagi, perekaman dilanjutkan")
-            status = {"time": datetime.now(UTC).isoformat(timespec="seconds"),
-                      "connected": self.client.session is not None, "site": self.cfg.site,
-                      "cameras": sorted(self.names), "disk": disk, "disk_full": self.disk_full,
-                      "counts": dict(self.stats)}  # fmt: skip
-            log.info("status %s", json.dumps(status["counts"], sort_keys=True))
-            tmp = self.cfg.root_dir / "status.json.tmp"
-            tmp.write_text(json.dumps(status, indent=2), encoding="utf-8")
-            tmp.replace(self.cfg.root_dir / "status.json")
+            try:
+                self._write_status()
+            except OSError as e:  # mis. flashdisk dicabut tanpa `lfc usb lepas`
+                log.warning("status.json tidak bisa ditulis: %s", e)
+
+    def _write_status(self) -> None:
+        # Berhenti karena disk penuh / flashdisk lepas: lanjut sendiri setelah masalahnya hilang.
+        # Jeda 2% sebelum lanjut supaya tidak bolak-balik berhenti-jalan tepat di batas disk.
+        problem = self.writer.storage_problem(margin_pct=2.0 if self.disk_full else 0.0)
+        if self.disk_full and problem is None:
+            self.disk_full = False
+            log.info("penyimpanan siap lagi, perekaman dilanjutkan")
+        elif problem and not self.disk_full:
+            self.disk_full = True
+            log.warning("perekaman berhenti: %s", problem)
+        status = {"time": datetime.now(UTC).isoformat(timespec="seconds"),
+                  "connected": self.client.session is not None, "site": self.cfg.site,
+                  "cameras": sorted(self.names), "disk": self.writer.disk_status(),
+                  "disk_full": self.disk_full, "storage_problem": problem,
+                  "counts": dict(self.stats)}  # fmt: skip
+        log.info("status %s", json.dumps(status["counts"], sort_keys=True))
+        # Tanpa flashdisk, status ditulis ke folder titik mount di memori internal (kecil, dan
+        # tertutup lagi saat flashdisk dipasang) supaya `lfc status` tetap menampilkan masalahnya.
+        self.cfg.root_dir.mkdir(parents=True, exist_ok=True)
+        tmp = self.cfg.root_dir / "status.json.tmp"
+        tmp.write_text(json.dumps(status, indent=2), encoding="utf-8")
+        tmp.replace(self.cfg.root_dir / "status.json")

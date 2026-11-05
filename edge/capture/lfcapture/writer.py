@@ -64,7 +64,8 @@ def fix_aspect(jpeg: bytes, aspect: tuple[int, int] | None) -> tuple[bytes, tupl
 
 
 class DiskFull(Exception):
-    """Batas disk tercapai; perekaman berhenti sementara, deteksi SysGuard tidak terganggu."""
+    """Batas disk tercapai atau flashdisk tidak terpasang; perekaman berhenti sementara,
+    deteksi SysGuard tidak terganggu."""
 
 
 @dataclass
@@ -114,20 +115,45 @@ def _write_atomic(path: Path, data: bytes) -> None:
     os.replace(tmp, path)
 
 
+def usb_mounted(cfg: Config) -> bool:
+    """True bila tidak memakai flashdisk, atau flashdisk terpasang di CAPTURE_DIR."""
+    return cfg.usb_uuid is None or os.path.ismount(cfg.root_dir)
+
+
 class DatasetWriter:
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        cfg.out_dir.mkdir(parents=True, exist_ok=True)
+        if usb_mounted(cfg):  # jangan membuat folder di memori internal di bawah titik mount
+            cfg.out_dir.mkdir(parents=True, exist_ok=True)
 
     def disk_status(self) -> dict:
-        usage = shutil.disk_usage(self.cfg.out_dir)
+        target = next((p for p in (self.cfg.out_dir, self.cfg.root_dir) if p.exists()), None)
+        if target is None:
+            return {"used_pct": None, "free_mb": None, "usb_mounted": usb_mounted(self.cfg)}
+        usage = shutil.disk_usage(target)
         used_pct = 100.0 * (usage.total - usage.free) / usage.total if usage.total else 100.0
-        return {"used_pct": round(used_pct, 1), "free_mb": usage.free // (1024 * 1024)}
+        return {"used_pct": round(used_pct, 1), "free_mb": usage.free // (1024 * 1024),
+                "usb_mounted": usb_mounted(self.cfg)}  # fmt: skip
+
+    def storage_problem(self, margin_pct: float = 0.0) -> str | None:
+        """Alasan perekaman harus berhenti, atau None bila boleh menyimpan.
+
+        `margin_pct` memberi jeda sebelum perekaman dilanjutkan, supaya tidak bolak-balik
+        berhenti-jalan tepat di batas disk.
+        """
+        if not usb_mounted(self.cfg):
+            return f"flashdisk {self.cfg.usb_uuid} tidak terpasang di {self.cfg.root_dir}"
+        s = self.disk_status()
+        if s["used_pct"] is None:
+            return f"folder {self.cfg.root_dir} tidak ada"
+        if s["used_pct"] >= self.cfg.disk_max_used_pct - margin_pct or s["free_mb"] < self.cfg.disk_min_free_mb:
+            return f"disk {s['used_pct']}% terpakai, sisa {s['free_mb']} MB"
+        return None
 
     def check_disk(self) -> None:
-        s = self.disk_status()
-        if s["used_pct"] >= self.cfg.disk_max_used_pct or s["free_mb"] < self.cfg.disk_min_free_mb:
-            raise DiskFull(f"disk {s['used_pct']}% terpakai, sisa {s['free_mb']} MB")
+        problem = self.storage_problem()
+        if problem:
+            raise DiskFull(problem)
 
     def day_dir(self, when: datetime) -> Path:
         day = self.cfg.out_dir / f"{self.cfg.prefix}-{when:%Y%m%d}"

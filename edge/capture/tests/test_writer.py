@@ -120,3 +120,22 @@ def test_save_records_saved_size_and_keeps_labels(tmp_path):
     assert meta["saved_size"] == [853, 480]
     # koordinat ternormalisasi tidak berubah oleh peregangan per sumbu
     assert (day / "labels" / f"{saved.image.stem}.txt").read_text().startswith("0 0.45000 0.50000")
+
+
+def test_usb_not_mounted_stops_saving_without_touching_internal_storage(tmp_path, monkeypatch):
+    import os
+
+    root = tmp_path / "dataset-usb"
+    root.mkdir()
+    cfg = make_config(root, CAPTURE_USB_UUID="D468-AC1E", CAPTURE_SITE="mondelez")
+    monkeypatch.setattr(os.path, "ismount", lambda p: False)
+    w = DatasetWriter(cfg)
+    assert not cfg.out_dir.exists()  # folder site tidak dibuat di bawah titik mount
+    assert w.disk_status()["usb_mounted"] is False
+    with pytest.raises(DiskFull, match="tidak terpasang"):
+        w.save(det(), JPEG, TS, "empty")
+    assert not list(root.rglob("*"))
+
+    monkeypatch.setattr(os.path, "ismount", lambda p: str(p) == str(root))
+    assert w.storage_problem() is None
+    assert w.save(det(), JPEG, TS, "empty").image.exists()

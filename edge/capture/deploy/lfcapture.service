@@ -4,7 +4,9 @@
 #   sudo loginctl enable-linger sysedge     (sekali; ulangi setelah update OS pindah slot)
 [Unit]
 Description=Perekam dataset LabelForge (lfcapture) dari deteksi SysGuard
-After=default.target
+After=default.target lfcapture-usb.service
+# Flashdisk (bila CAPTURE_USB_UUID diisi) dipasang lebih dulu; tanpa unit itu tidak berpengaruh.
+Wants=lfcapture-usb.service
 
 [Service]
 Type=simple
